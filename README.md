@@ -22,12 +22,16 @@ go build -o memory-mcp.exe ./cmd/memory-mcp
 **stdio（供 Cursor / AgentTest `plan_memory_hook` 挂载）：**
 
 ```powershell
-# 默认 stub 引擎
+# 默认 factworld 引擎（规则抽取 + JSONL 事实库 + 关键词检索）
 .\memory-mcp.exe
 
-# 测试引擎：内嵌已完成 TodoList，命中则返回固定成功 hints；store 写入 data/store_log/*.md
+# 测试引擎：内嵌已完成 TodoList 样本（CI/回归）
 .\memory-mcp.exe -engine test
-# 或环境变量 MEMORY_MCP_ENGINE=test
+
+# Phase-1 stub
+.\memory-mcp.exe -engine stub
+
+# 环境变量 MEMORY_MCP_ENGINE=factworld|test|stub
 ```
 
 **HTTP（调试）：**

@@ -25,7 +25,7 @@ import (
 var (
 	httpAddr   = flag.String("http", "", "若设置则使用 Streamable HTTP，否则使用 stdin/stdout")
 	dataDir    = flag.String("data", "", "数据目录（默认 ./data 或环境变量 MEMORY_MCP_DATA_DIR）")
-	engineKind = flag.String("engine", "", "引擎：stub（默认）| test（内嵌已完成 TodoList 样本）")
+	engineKind = flag.String("engine", "", "引擎：factworld（默认）| stub | test（内嵌样本）")
 )
 
 func main() {
@@ -41,17 +41,20 @@ func main() {
 		kind = os.Getenv("MEMORY_MCP_ENGINE")
 	}
 	if kind == "" {
-		kind = "stub"
+		kind = "factworld"
 	}
 	var eng engine.Engine
 	var err error
 	switch strings.ToLower(kind) {
-	case "test", "fixture":
-		eng, err = engine.NewTestEngine(dir)
-		log.Printf("[memory-mcp] engine=test-fixture (embedded completed TodoList)")
-	default:
+	case "stub":
 		eng, err = engine.NewStubEngine(dir)
 		log.Printf("[memory-mcp] engine=stub")
+	case "test", "fixture":
+		eng, err = engine.NewTestEngine(dir)
+		log.Printf("[memory-mcp] engine=test-fixture")
+	default:
+		eng, err = engine.NewFactWorldEngine(dir, engine.FactWorldConfig{})
+		log.Printf("[memory-mcp] engine=factworld (rules extract + JSONL index)")
 	}
 	if err != nil {
 		log.Fatalf("engine: %v", err)

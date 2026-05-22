@@ -7,6 +7,9 @@ enabled: true
 description: "长效事实记忆；Host 钩子 store/retrieve"
 transport: stdio
 command: "C:\\DATA\\GODATA\\AgentTestMemoryMCP\\memory-mcp.exe"
-args: []
+args:
+  - "-engine"
+  - "factworld"
 env:
   MEMORY_MCP_DATA_DIR: "C:\\DATA\\GODATA\\AgentTestMemoryMCP\\data"
+  # MEMORY_MCP_ENGINE: factworld   # 与 -engine factworld 等价
