@@ -17,15 +17,17 @@ import (
 	"os"
 	"strings"
 
+	"AgentTestMemoryMCP/internal/console"
 	"AgentTestMemoryMCP/internal/engine"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 var (
-	httpAddr   = flag.String("http", "", "若设置则使用 Streamable HTTP，否则使用 stdin/stdout")
-	dataDir    = flag.String("data", "", "数据目录（默认 ./data 或环境变量 MEMORY_MCP_DATA_DIR）")
-	engineKind = flag.String("engine", "", "引擎：factworld（默认）| stub | test（内嵌样本）")
+	httpAddr    = flag.String("http", "", "若设置则使用 Streamable HTTP（MCP），并可同时挂载 /console/ 开发 UI")
+	consoleAddr = flag.String("console", "", "仅启动记忆拓扑开发控制台（只读），如 127.0.0.1:8091")
+	dataDir     = flag.String("data", "", "数据目录（默认 ./data 或环境变量 MEMORY_MCP_DATA_DIR）")
+	engineKind  = flag.String("engine", "", "引擎：factworld（默认）| stub | test（内嵌样本）")
 )
 
 func main() {
@@ -68,12 +70,36 @@ func main() {
 
 	registerTools(server, eng)
 
+	consoleSrv, consoleErr := console.NewServer(dir)
+	if consoleErr != nil {
+		log.Printf("[memory-mcp] console disabled: %v", consoleErr)
+		consoleSrv = nil
+	}
+
+	if addr := trim(*consoleAddr); addr != "" && trim(*httpAddr) == "" {
+		if consoleSrv == nil {
+			log.Fatalf("console: %v", consoleErr)
+		}
+		log.Printf("[memory-mcp] dev console http://%s/console/ (read-only topology)", addr)
+		log.Printf("[memory-mcp] console data_dir=%s facts=%d", dir, consoleSrv.FactsCount())
+		if err := http.ListenAndServe(addr, consoleWithRoot(consoleSrv)); err != nil {
+			log.Fatalf("console: %v", err)
+		}
+		return
+	}
+
 	if addr := trim(*httpAddr); addr != "" {
-		handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+		mux := http.NewServeMux()
+		mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 			return server
 		}, nil)
+		mux.Handle("/", mcpHandler)
+		if consoleSrv != nil {
+			consoleSrv.MountPath(mux)
+			log.Printf("[memory-mcp] dev console http://%s/console/", addr)
+		}
 		log.Printf("[memory-mcp] streamable HTTP listening on %s", addr)
-		if err := http.ListenAndServe(addr, handler); err != nil {
+		if err := http.ListenAndServe(addr, mux); err != nil {
 			log.Fatalf("http: %v", err)
 		}
 		return
@@ -130,6 +156,20 @@ func textResult(jsonText string) *mcp.CallToolResult {
 			&mcp.TextContent{Text: jsonText},
 		},
 	}
+}
+
+// consoleWithRoot 独立控制台模式：/ 重定向到 /console/。
+func consoleWithRoot(srv *console.Server) http.Handler {
+	mux := http.NewServeMux()
+	srv.MountPath(mux)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/console/", http.StatusFound)
+			return
+		}
+		http.NotFound(w, r)
+	})
+	return mux
 }
 
 func trim(s string) string {

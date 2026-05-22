@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Memory MCP · 记忆拓扑</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="vendor/vis-network.min.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◇</span>
+      <h1>AgentTest Memory</h1>
+      <span class="phase">factworld · 开发控制台</span>
+    </div>
+    <div class="search-wrap">
+      <input type="search" id="searchInput" placeholder="搜索记忆节点：事实 ID、正文、标签、工具、correlation…" autocomplete="off" />
+      <button type="button" id="searchBtn">搜索</button>
+      <button type="button" id="clearSearchBtn" class="ghost" title="清除高亮">清除</button>
+    </div>
+    <div class="actions">
+      <button type="button" id="refreshBtn">刷新图</button>
+      <label class="toggle"><input type="checkbox" id="physicsToggle" checked /> 物理布局</label>
+    </div>
+  </header>
+
+  <div id="searchResults" class="search-results hidden"></div>
+
+  <main class="layout">
+    <aside class="legend">
+      <h2>节点类型</h2>
+      <ul>
+        <li><span class="dot fact"></span> 事实 Fact</li>
+        <li><span class="dot episode"></span> Episode</li>
+        <li><span class="dot tag"></span> 标签 Tag</li>
+        <li><span class="dot tool"></span> 工具 Tool</li>
+        <li><span class="dot source"></span> 来源 Source</li>
+      </ul>
+      <h2>边含义</h2>
+      <ul class="edge-legend">
+        <li><span class="edge from_episode"></span> from_episode</li>
+        <li><span class="edge has_tag"></span> has_tag</li>
+        <li><span class="edge used_tool"></span> used_tool</li>
+        <li><span class="edge same_correlation"></span> same_turn</li>
+        <li><span class="edge similar"></span> similar</li>
+      </ul>
+      <div id="stats" class="stats">加载中…</div>
+    </aside>
+
+    <section class="graph-panel">
+      <div id="graph"></div>
+      <div id="graphError" class="graph-error hidden"></div>
+      <div id="emptyState" class="empty-state hidden">
+        <p>当前数据目录下没有事实节点。</p>
+        <p>请确认启动参数：<code>-data</code> 或环境变量 <code>MEMORY_MCP_DATA_DIR</code> 指向含 <code>facts/facts.jsonl</code> 的目录。</p>
+      </div>
+      <p id="status" class="status">初始化…</p>
+    </section>
+
+    <aside class="detail" id="detailPanel">
+      <h2>节点详情</h2>
+      <p class="hint">点击图中的节点查看完整字段</p>
+      <pre id="detailBody"></pre>
+    </aside>
+  </main>
+
+  <script src="vendor/vis-network.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

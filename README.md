@@ -38,7 +38,32 @@ go build -o memory-mcp.exe ./cmd/memory-mcp
 
 ```powershell
 .\memory-mcp.exe -http 127.0.0.1:8090
+# 同时可打开开发控制台：http://127.0.0.1:8090/console/
 ```
+
+**记忆拓扑开发控制台（只读，与 stdio MCP 并行）：**
+
+AgentTest 主进程仍用 stdio 挂载 MCP 时，可**另开终端**只读同一 `data` 目录：
+
+```powershell
+$env:MEMORY_MCP_DATA_DIR = "C:/DATA/GODATA/AgentTestMemoryMCP/data"
+.\memory-mcp.exe -console 127.0.0.1:8091
+# 浏览器打开 http://127.0.0.1:8091/console/
+```
+
+- 力导向**拓扑图**：Fact / Episode / Tag / Tool / Source 及关联边（has_tag、used_tool、similar 等）
+- 顶部**搜索栏**：按事实正文、ID、标签、tools、correlation 定位并高亮节点
+- **vis-network 已内置**（`web/vendor/`，不依赖外网 CDN）
+
+**若页面空白、看不到拓扑：**
+
+1. 必须用 **`-console`**（仅 `go run` 默认 stdio **不会**开 8091 控制台）  
+2. **重新 `go build`** 后再启动（旧 exe 无内置 vis / 无 console 路由）  
+3. 指定数据目录：`-data C:/DATA/GODATA/AgentTestMemoryMCP/data` 或 `MEMORY_MCP_DATA_DIR`  
+4. 启动日志应出现：`console data_dir=... facts=N`（N>0 才有图）  
+5. 浏览器访问 **http://127.0.0.1:8091/console/**（注意 `/console/`）  
+6. 自检：打开 http://127.0.0.1:8091/console/api/stats 应返回 `facts_count`  
+7. 浏览器 **Ctrl+F5** 强刷缓存
 
 环境变量：
 
