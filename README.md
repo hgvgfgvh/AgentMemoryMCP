@@ -51,7 +51,7 @@ $env:MEMORY_MCP_DATA_DIR = "C:/DATA/GODATA/AgentTestMemoryMCP/data"
 # 浏览器打开 http://127.0.0.1:8091/console/
 ```
 
-- 力导向**拓扑图**：Fact / Episode / Tag / Tool / Source 及关联边（has_tag、used_tool、similar 等）
+- **3D 力导向拓扑图**（three.js + 3d-force-graph）：Fact / Episode / Tag / Tool / Source 及关联边；支持旋转、缩放、平移、搜索聚焦
 - 顶部**搜索栏**：按事实正文、ID、标签、tools、correlation 定位并高亮节点
 - **vis-network 已内置**（`web/vendor/`，不依赖外网 CDN）
 

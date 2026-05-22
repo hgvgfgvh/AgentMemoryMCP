@@ -183,6 +183,7 @@ button.ghost {
 
 #graph canvas {
   display: block;
+  outline: none;
 }
 
 .status {

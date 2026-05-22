@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Memory MCP · 记忆拓扑</title>
+  <title>Memory MCP · 记忆拓扑 3D</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="vendor/vis-network.min.css" />
 </head>
 <body>
   <header class="topbar">
@@ -21,7 +20,8 @@
     </div>
     <div class="actions">
       <button type="button" id="refreshBtn">刷新图</button>
-      <label class="toggle"><input type="checkbox" id="physicsToggle" checked /> 物理布局</label>
+      <button type="button" id="resetViewBtn" class="ghost">重置视角</button>
+      <label class="toggle"><input type="checkbox" id="physicsToggle" checked /> 力导向动画</label>
     </div>
   </header>
 
@@ -60,12 +60,13 @@
 
     <aside class="detail" id="detailPanel">
       <h2>节点详情</h2>
-      <p class="hint">点击图中的节点查看完整字段</p>
+      <p class="hint">点击 3D 球体查看完整字段；拖拽旋转、滚轮缩放</p>
       <pre id="detailBody"></pre>
     </aside>
   </main>
 
-  <script src="vendor/vis-network.min.js"></script>
+  <script src="vendor/three.min.js"></script>
+  <script src="vendor/3d-force-graph.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
