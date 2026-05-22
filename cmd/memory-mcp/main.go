@@ -1,0 +1,144 @@
+// memory-mcp：长效事实记忆 MCP Server（Phase-1 架构骨架）。
+//
+// 对外工具：memory_store、memory_retrieve（字符串协议）。
+// 内部：StubEngine，不实现记忆 Agent / 图结构 / 向量索引。
+//
+// 用法：
+//
+//	stdio（默认）: memory-mcp.exe
+//	HTTP:         memory-mcp.exe -http 127.0.0.1:8090
+package main
+
+import (
+	"context"
+	"flag"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+
+	"AgentTestMemoryMCP/internal/engine"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+var (
+	httpAddr   = flag.String("http", "", "若设置则使用 Streamable HTTP，否则使用 stdin/stdout")
+	dataDir    = flag.String("data", "", "数据目录（默认 ./data 或环境变量 MEMORY_MCP_DATA_DIR）")
+	engineKind = flag.String("engine", "", "引擎：stub（默认）| test（内嵌已完成 TodoList 样本）")
+)
+
+func main() {
+	flag.Parse()
+	log.SetOutput(os.Stderr)
+
+	dir := *dataDir
+	if dir == "" {
+		dir = os.Getenv("MEMORY_MCP_DATA_DIR")
+	}
+	kind := trim(*engineKind)
+	if kind == "" {
+		kind = os.Getenv("MEMORY_MCP_ENGINE")
+	}
+	if kind == "" {
+		kind = "stub"
+	}
+	var eng engine.Engine
+	var err error
+	switch strings.ToLower(kind) {
+	case "test", "fixture":
+		eng, err = engine.NewTestEngine(dir)
+		log.Printf("[memory-mcp] engine=test-fixture (embedded completed TodoList)")
+	default:
+		eng, err = engine.NewStubEngine(dir)
+		log.Printf("[memory-mcp] engine=stub")
+	}
+	if err != nil {
+		log.Fatalf("engine: %v", err)
+	}
+
+	server := mcp.NewServer(&mcp.Implementation{
+		Name:    "agent-test-memory",
+		Title:   "AgentTest Memory MCP",
+		Version: "0.1.0-phase1",
+	}, nil)
+
+	registerTools(server, eng)
+
+	if addr := trim(*httpAddr); addr != "" {
+		handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+			return server
+		}, nil)
+		log.Printf("[memory-mcp] streamable HTTP listening on %s", addr)
+		if err := http.ListenAndServe(addr, handler); err != nil {
+			log.Fatalf("http: %v", err)
+		}
+		return
+	}
+
+	t := &mcp.LoggingTransport{Transport: &mcp.StdioTransport{}, Writer: os.Stderr}
+	log.Printf("[memory-mcp] stdio transport (phase-1 stub)")
+	if err := server.Run(context.Background(), t); err != nil {
+		log.Fatalf("server: %v", err)
+	}
+}
+
+func registerTools(server *mcp.Server, eng engine.Engine) {
+	type storeArgs struct {
+		Content       string `json:"content" jsonschema:"required,待沉淀的原始文本（单条 episode）"`
+		Source        string `json:"source,omitempty" jsonschema:"Host 标识，如 agenttest-plan"`
+		Kind          string `json:"kind,omitempty" jsonschema:"粗分类，如 episode、note"`
+		CorrelationID string `json:"correlation_id,omitempty" jsonschema:"Host 关联 ID，如 turn_id"`
+	}
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "memory_store",
+		Description: `存入事实材料（字符串协议）。外部仅投递 content；关系与图由内部 Memory Agent 处理（Phase-1 未实现）。
+同步返回 JSON 字符串：accepted、job_id、skipped 等字段均为 string。存入可异步，本工具先 ACK。`,
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args storeArgs) (*mcp.CallToolResult, any, error) {
+		out := eng.Store(ctx, engine.StoreInput{
+			Content:       args.Content,
+			Source:        args.Source,
+			Kind:          args.Kind,
+			CorrelationID: args.CorrelationID,
+		})
+		return textResult(out), nil, nil
+	})
+
+	type retrieveArgs struct {
+		Context   string `json:"context" jsonschema:"required,Host 本轮完整上下文字符串（含用户输入与会话级摘要）"`
+		QueryHint string `json:"query_hint,omitempty" jsonschema:"可选补充检索意图，不能替代 context"`
+	}
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "memory_retrieve",
+		Description: `取出记忆参考提示（字符串协议）。须传 context；由内部 Memory Agent 裁切 hints（Phase-1 返回 stub 占位）。
+同步、快速。返回 JSON 字符串：hints、skipped 等字段均为 string。`,
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args retrieveArgs) (*mcp.CallToolResult, any, error) {
+		out := eng.Retrieve(ctx, engine.RetrieveInput{
+			Context:   args.Context,
+			QueryHint: args.QueryHint,
+		})
+		return textResult(out), nil, nil
+	})
+}
+
+func textResult(jsonText string) *mcp.CallToolResult {
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: jsonText},
+		},
+	}
+}
+
+func trim(s string) string {
+	for len(s) > 0 && (s[0] == ' ' || s[0] == '\t') {
+		s = s[1:]
+	}
+	for len(s) > 0 {
+		c := s[len(s)-1]
+		if c != ' ' && c != '\t' && c != '\r' && c != '\n' {
+			break
+		}
+		s = s[:len(s)-1]
+	}
+	return s
+}

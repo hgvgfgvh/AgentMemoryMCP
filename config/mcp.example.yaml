@@ -1,0 +1,12 @@
+# Cursor / AgentTest 挂载示例（复制到 Host 的 mcp 配置）
+#
+# 注意：不要写入 capabilities.attach_to（planAgent / behaviorAgent）
+
+name: memory
+enabled: true
+description: "长效事实记忆；Host 钩子 store/retrieve"
+transport: stdio
+command: "C:\\DATA\\GODATA\\AgentTestMemoryMCP\\memory-mcp.exe"
+args: []
+env:
+  MEMORY_MCP_DATA_DIR: "C:\\DATA\\GODATA\\AgentTestMemoryMCP\\data"
