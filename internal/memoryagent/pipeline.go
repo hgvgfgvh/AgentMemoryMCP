@@ -44,6 +44,9 @@ func ProcessEpisode(ctx context.Context, jobID, source, kind, correlationID, con
 			out.AtomsKept = kept
 			out.AtomsDrop = dropped
 			if len(out.Facts) > 0 {
+				f := out.Facts[0]
+				f, out.SupersedeIDs, out.FuzzyPairs = EnrichAlignment(f, existing, correlationID, out.SupersedeIDs)
+				out.Facts[0] = f
 				return out
 			}
 		} else if err != nil {
@@ -52,5 +55,12 @@ func ProcessEpisode(ctx context.Context, jobID, source, kind, correlationID, con
 	}
 
 	fs := agent.ExtractFromEpisode(jobID, source, kind, correlationID, content)
-	return ProcessOutput{Facts: fs, UsedLLM: false, Fallback: true}
+	out := ProcessOutput{Facts: fs, UsedLLM: false, Fallback: true}
+	if len(out.Facts) > 0 {
+		f := out.Facts[0]
+		f.LastActive = f.CreatedAt
+		f, out.SupersedeIDs, out.FuzzyPairs = EnrichAlignment(f, existing, correlationID, nil)
+		out.Facts[0] = f
+	}
+	return out
 }

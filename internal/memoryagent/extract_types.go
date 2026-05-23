@@ -1,6 +1,9 @@
 package memoryagent
 
-import "AgentTestMemoryMCP/internal/facts"
+import (
+	"AgentTestMemoryMCP/internal/entity"
+	"AgentTestMemoryMCP/internal/facts"
+)
 
 // ExtractResult LLM 结构化抽取输出（S5）。
 type ExtractResult struct {
@@ -41,12 +44,14 @@ type EdgeExtract struct {
 
 // ProcessOutput Store 流水线最终产物。
 type ProcessOutput struct {
-	Facts     []facts.Fact
-	Atoms     []StoredAtom
-	UsedLLM   bool
-	Fallback  bool
-	AtomsKept int
-	AtomsDrop int
+	Facts        []facts.Fact
+	Atoms        []StoredAtom
+	UsedLLM      bool
+	Fallback     bool
+	AtomsKept    int
+	AtomsDrop    int
+	SupersedeIDs []string
+	FuzzyPairs   []entity.FuzzyPair
 }
 
 // StoredAtom 持久化原子记录。

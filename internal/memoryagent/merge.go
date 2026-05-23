@@ -60,6 +60,8 @@ func MergeExtract(jobID, source, kind, correlationID, content string, ex *Extrac
 		TierHint:      2,
 		Confidence:    conf,
 		Weight:        weight,
+		LastActive:    now,
+		AccessCount:   0,
 		CreatedAt:     now,
 	}
 	var atoms []StoredAtom
@@ -81,7 +83,10 @@ func MergeExtract(jobID, source, kind, correlationID, content string, ex *Extrac
 	}
 	_ = kind
 	_ = content
-	return ProcessOutput{Facts: []facts.Fact{f}, Atoms: atoms, UsedLLM: true}
+	return ProcessOutput{
+		Facts: []facts.Fact{f}, Atoms: atoms, UsedLLM: true,
+		SupersedeIDs: ex.SupersedeFactIDs,
+	}
 }
 
 func min(a, b int) int {

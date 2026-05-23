@@ -1,8 +1,9 @@
 # 架构地图（与 DESIGN_INTENT 对齐）
 
 > **宪法**：`DESIGN_INTENT.md`  
-> **As-Is**：`CURRENT_IMPLEMENTATION_ARCHITECTURE.md`（Phase-2a factworld + 伴生控制台）  
-> **To-Be 落地**：`MEMORY_AGENT_IMPLEMENTATION_PLAN.md`（2b～2e，**已批准实施**）  
+> **As-Is**：`CURRENT_IMPLEMENTATION_ARCHITECTURE.md`（**Phase-2d**）  
+> **进度**：`IMPLEMENTATION_PROGRESS.md`（2b～2d ✅；2e ⏸）  
+> **方案全文**：`MEMORY_AGENT_IMPLEMENTATION_PLAN.md`  
 > **漂移**：`ARCHITECTURE_DRIFT.md`
 
 ---
@@ -11,64 +12,55 @@
 
 | 阶段 | 状态 | 要点 |
 |------|------|------|
-| Phase-1 stub | 已保留 | `-engine stub` / `test`；审计队列 |
-| **Phase-2a** | **当前默认** | `FactWorldEngine` 规则抽取；关键词 retrieve；`facts.jsonl`；伴生 3D 控制台 |
-| Phase-2b | **下一步** | `edges.jsonl`、Weighted BFS（出度惩罚+防环）、BM25 剪枝、pitfall |
-| Phase-2c | 计划 | LLM 结构化抽取、L0/L1(fuzzy)、S5 失败回退 rules |
-| Phase-2d | 计划 | supersede 退化、embedding≥0.92、模糊带异步 LLM 对齐 |
-| Phase-2e | 计划 | 可选 retrieve LLM prune（默认仍 bm25） |
+| Phase-1 stub | 已保留 | `-engine stub` / `test` |
+| Phase-2a | ✅ | 规则抽取、关键词 retrieve、伴生控制台 |
+| Phase-2b | ✅ | `edges.jsonl`、BFS、BM25、pitfall、retrieve 预算 |
+| Phase-2c | ✅ | LLM extract、L0/L1 fuzzy、atoms、`rules` 回退 |
+| **Phase-2d** | ✅ **当前** | supersede、硬合并、异步对齐、访问衰减 |
+| Phase-2e | ⏸ **暂缓** | retrieve LLM prune（默认不实现，保持 `bm25`） |
 
 ---
 
-## 总览（当前 Phase-2a）
+## 总览（当前 Phase-2d）
 
 ```text
 Host（AgentTest 等）
-  │ 钩子 OnTurnRetrieve / OnTurnStore / DecideRoute（不经执行 Agent tool_calls）
+  │ 钩子 OnTurnRetrieve / OnTurnStore / DecideRoute
   ▼
-MCP Client（stdio，默认）
+MCP Client（stdio）
   ▼
 cmd/memory-mcp/main.go
-  ├── memory_store   → engine.FactWorldEngine.Store
-  │       filter → episode → job → [async] rules.ExtractFromEpisode → facts.jsonl
-  └── memory_retrieve → engine.FactWorldEngine.Retrieve
-          filter → facts.List → MatchScore → BuildHints + ---memory-route---
-  └── console.Server（伴生 HTTP，只读，默认 :8091）
+  ├── memory_store → FactWorldEngine.Store
+  │     filter → episode → job → [async]
+  │       memoryagent: template → preparse → [LLM | rules] → L0/L1 → merge
+  │       degenerate + entity/align → facts.jsonl + edges.jsonl + atoms.jsonl
+  └── memory_retrieve → FactWorldEngine.Retrieve
+        filter → loadGraph → BFS → BM25 prune (budget) → hints + memory-route
+        (跳过 superseded；命中 touch last_active)
+  └── console.Server（伴生 :8091，只读）
 ```
 
 ---
 
-## 目标总览（Phase-2b+，见实现方案）
+## 模块职责（Phase-2d）
 
-```text
-Store (async):
-  filter → episode → job → template → preparse → [LLM extract | rules fallback]
-    → validate L0/L1(fuzzy)/L2 → merge → degenerate → facts.jsonl + edges.jsonl
-
-Retrieve (sync, budget≤300ms):
-  filter → loadGraph → seedAnchor(BM25) → weightedBFS → prune(bm25|llm?) → hints
-```
-
----
-
-## 模块职责（当前 + 规划）
-
-| 路径 | 职责 | 阶段 |
-|------|------|------|
-| `cmd/memory-mcp` | MCP 入口；stdio/HTTP/console；注册工具 | 2a |
-| `internal/engine` | `Engine`；`FactWorldEngine`、`StubEngine`、`TestEngine` | 2a |
-| `internal/agent/rules.go` | 规则抽取 episode → Fact | 2a |
-| `internal/facts` | `facts.jsonl` CRUD | 2a |
-| `internal/filter` | store/retrieve 寒暄、空输入 | 2a |
-| `internal/retrieve` | 打分、`BuildHints`、`memory-route` | 2a → 2b 演进 prune |
-| `internal/response` | JSON 字符串响应 | 2a |
-| `internal/textutil` | 分词/匹配 | 2a |
-| `internal/console` | 3D 拓扑、搜索 API（只读） | 2a |
-| `internal/graph/*` | 邻接表加载、Weighted BFS | **2b** |
-| `internal/index/bm25.go` | BM25 索引 | **2b** |
-| `internal/memoryagent/*` | Store 流水线、LLM extract、validate、fuzzy | **2c** |
-| `internal/degenerate/*` | supersede、weight 衰减 | **2d** |
-| `internal/llm/*` | OpenAI 兼容客户端、超时 | **2c** |
+| 路径 | 职责 |
+|------|------|
+| `cmd/memory-mcp` | MCP 入口；stdio/HTTP/console |
+| `internal/engine/factworld.go` | Store/Retrieve 编排 |
+| `internal/agent/rules.go` | 规则抽取（LLM 回退） |
+| `internal/memoryagent/*` | Store 流水线、template、validate、fuzzy |
+| `internal/llm/*` | OpenAI 兼容客户端 |
+| `internal/atoms` | `atoms.jsonl` |
+| `internal/facts` | `facts.jsonl`（含 superseded / last_active） |
+| `internal/graph/*` | `edges.jsonl`、BFS |
+| `internal/index/bm25.go` | BM25 |
+| `internal/retrieve/*` | pipeline、hints、memory-route |
+| `internal/degenerate/*` | supersede、衰减、touch |
+| `internal/entity` + `internal/embedding` | 硬合并 |
+| `internal/align` | 模糊带异步 LLM |
+| `internal/filter` | 寒暄过滤 |
+| `internal/console` | 3D 开发台（只读） |
 
 ---
 
@@ -88,33 +80,22 @@ Retrieve (sync, budget≤300ms):
 |----|------|
 | **入参** | `context`（required string），`query_hint` |
 | **出参** | JSON 字符串：`hints`、`skipped`、`skip_reason`、`phase` |
-| **行为（2a）** | 全量读 facts → `MatchScore` → Top-K hints + `---memory-route---` |
-| **行为（2b+）** | 加载图 → 锚定 → BFS → BM25 复合打分 → hints（预算内） |
+| **行为（2d）** | 加载图 → BFS → BM25 剪枝 → hints（预算内）；`phase=2d-factworld` |
 
 ---
 
 ## 持久化布局
 
-### 当前（2a）
+### 当前（2d）
 
 ```text
 data/
-  facts/facts.jsonl
-  episodes/YYYY-MM-DD/
-  store_log/
-  jobs/pending|done|dead/
-```
-
-### 目标（2b+）
-
-```text
-data/
-  facts/facts.jsonl          # Summary Fact（Host hints 主索引）
-  graph/edges.jsonl          # 持久边（BFS 依据）
-  graph/nodes.jsonl          # 可选实体目录
+  facts/facts.jsonl          # Summary Fact（含 superseded / last_active）
+  graph/edges.jsonl          # 持久边（BFS）
   atoms/atoms.jsonl          # 原子三元组审计
-  episodes/ ...
-  jobs/ ...
+  episodes/YYYY-MM-DD/
+  jobs/pending|done|dead/
+  store_log/
 ```
 
 ---
@@ -139,7 +120,7 @@ data/
 | `MEMORY_MCP_CONSOLE_LISTEN` | `127.0.0.1:8091` | stdio 伴生控制台 |
 | `MEMORY_MCP_CONSOLE_DISABLE` | - | `1` 关闭控制台 |
 | `MEMORY_MCP_RETRIEVE_BUDGET_MS` | `300` | retrieve 总预算（**2b 起强制**） |
-| `MEMORY_MCP_RETRIEVE_PRUNE` | `bm25` | `bm25` \| `llm`（**2e**） |
+| `MEMORY_MCP_RETRIEVE_PRUNE` | `bm25` | 仅 `bm25` 已实现；`llm` 属 **2e 暂缓** |
 | `MEMORY_MCP_LLM_EXTRACT` | `1` | Store 是否 LLM（**2c**） |
 | `MEMORY_MCP_LLM_API_BASE` / `MODEL` | - | OpenAI 兼容（**2c**） |
 
@@ -173,3 +154,4 @@ data/
 |------|------|
 | 2026-05-20 | Phase-1 stub 架构地图 |
 | 2026-05-23 | 对齐 2a 实现、2b～2e 路线图、模块与环境变量、交叉引用 |
+| 2026-05-24 | 当前阶段 2d；总览与模块表结案；2e 暂缓 |

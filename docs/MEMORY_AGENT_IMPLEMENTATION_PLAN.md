@@ -1,9 +1,10 @@
 # Memory MCP 记忆体机制 — 推荐实现方案（供专家评审）
 
-> **文档性质**：在 As-Is 与宪法基础上，**Phase-2b～2e 批准落地路径**。  
+> **文档性质**：在 As-Is 与宪法基础上，**Phase-2b～2e 批准落地路径**（历史方案全文）。  
 > **读者**：外部专家、实现 Agent。  
 > **日期**：2026-05-23（v2：合并专家评审结论）  
-> **状态**：**可进入实施**（Implementation Approved）
+> **状态**：**Phase-2b～2d 已完成**（2026-05-23）；**Phase-2e 暂缓**（2026-05-24，见 §13）  
+> **进度总表**：`IMPLEMENTATION_PROGRESS.md`
 
 **同目录文档**
 
@@ -27,7 +28,7 @@
 | **LLM 边界** | Store 异步 **1 次**结构化抽取（失败回退 rules）；Retrieve **默认 BM25×激活能级×weight**；LLM prune **默认关闭** |
 | **实体对齐** | 硬规则规范化 + cosine≥0.92 自动合并；**禁止** Store 主链默认 LLM 对齐；模糊带 0.85–0.92 仅 2d 异步增量 |
 | **Host 契约** | 不变：仅 `memory_store` / `memory_retrieve` 字符串；图/三元组/Ontology **不暴露** |
-| **落地顺序** | 2b 图+persist+BFS+pitfall → 2c Store LLM+Check → 2d 实体对齐+退化 → 2e 可选 retrieve LLM |
+| **落地顺序** | 2b ✅ → 2c ✅ → 2d ✅ → **2e ⏸ 暂缓**（retrieve LLM prune，默认不实现） |
 
 ---
 
@@ -446,16 +447,16 @@ AgentTestMemoryMCP/internal/
 
 ## 8. 分阶段交付（PR 粒度）
 
-| 阶段 | 交付物 | 验收标准 |
-|------|--------|----------|
-| **2b** | `edges.jsonl`、pitfall、Weighted BFS（**出度惩罚+防环**）、BM25 prune、图加载 | **Baseline**：retrieve P95 <50ms；联想 pitfall 可测；无 LLM |
-| **2c** | template、llm_extract、L0、**L1 fuzzy**、S5 失败回退 rules | 多 atoms；L1 通过率；LLM 挂掉仍可用 summary |
-| **2d** | supersede 退化、**embedding≥0.92 硬合并**、模糊带异步 LLM 对齐、access 衰减 | 旧 fact 降权；Store 吞吐不降 |
-| **2e** | 可选 R4' LLM prune | 仅冲突/含糊场景；默认仍 bm25 |
+| 阶段 | 状态 | 交付物 | 验收标准 |
+|------|------|--------|----------|
+| **2b** | ✅ 完成 | `edges.jsonl`、pitfall、Weighted BFS（**出度惩罚+防环**）、BM25 prune、图加载 | Baseline：边界测试通过；无 retrieve LLM |
+| **2c** | ✅ 完成 | template、llm_extract、L0、**L1 fuzzy**、S5 失败回退 rules | `llm_store_smoke`；atoms.jsonl |
+| **2d** | ✅ 完成 | supersede 退化、**embedding≥0.92 硬合并**、模糊带异步 LLM 对齐、access 衰减 | supersede 可观测；Store 不阻塞 |
+| **2e** | ⏸ **暂缓** | 可选 R4' LLM prune | **不实施**；默认保持 `bm25`（§13） |
 
-**每阶段不破坏**：stdio MCP 双工具、Host 无需改代码（2b～2d）。
+**每阶段不破坏**：stdio MCP 双工具、Host 无需改代码（2b～2d）——**已验证**。
 
-**实施顺序（专家确认）**：**立即启动 2b**，形成无 LLM 图检索基准线后，再叠加 2c Store LLM 与 2d 对齐。
+**实施结论（2026-05-24）**：2b～2d 已按专家顺序落地；2e 经产品与实测评估**暂不排期**。
 
 ---
 
@@ -491,9 +492,11 @@ AgentTestMemoryMCP/internal/
 - **A. 出度惩罚**：`factor /= ln(3 + OutDegree(u))`，抑制 `completed`/`filesystem` 等 hub 炸图。  
 - **B. BFS 防环**：`visited` 或路径去重，防止 `similar` 双向边死循环。
 
-### 10.4 实施批准
+### 10.4 实施批准与结案
 
-专家评审：**可立即按 §8 排期落地**；优先 **2b（无 LLM 内存图 + BFS + BM25）** 建立 Baseline，再进入 2c/2d。
+- **2026-05-23**：专家评审批准按 §8 排期；优先 2b Baseline，再 2c/2d。  
+- **2026-05-24**：**2b～2d 已交付**；集成测试（`memory_boundary_test`、`memory_complex_test`、`llm_store_smoke`）通过。  
+- **2e**：**暂缓**，理由见 §13 与 `IMPLEMENTATION_PROGRESS.md`。
 
 ---
 
@@ -515,15 +518,48 @@ AgentTestMemoryMCP/internal/
 
 ---
 
-## 12. 2b 实施检查清单（可直接开工）
+## 12. 分阶段实施检查清单（结案）
 
-- [ ] `graph/edges.jsonl` 持久化；Store job 写边（规则从 atoms 或 summary 推导）  
-- [ ] `graph/load.go` + `graph/bfs.go`（出度惩罚 + visited）  
-- [ ] `index/bm25.go` + `retrieve/prune.go` 复合打分  
-- [ ] pitfall 边类型 + retrieve 抑制 `exec_simple_match`  
-- [ ] 单元测试：hub 节点不炸图；similar 环不死循环；BM25-only P95 <50ms  
-- [ ] Console 读 `edges.jsonl`（与线上一致）  
-- [ ] 更新 `ARCHITECTURE_DRIFT.md` / `CURRENT_IMPLEMENTATION_ARCHITECTURE.md` 指向 2b  
+### 2b ✅
+
+- [x] `graph/edges.jsonl` 持久化；Store job 写边  
+- [x] `graph/load.go` + `graph/bfs.go`（出度惩罚 + visited）  
+- [x] `index/bm25.go` + `retrieve/pipeline.go` 复合打分  
+- [x] pitfall + retrieve 抑制 `exec_simple_match`  
+- [x] 单元测试：hub / similar 环 / BM25  
+- [ ] Console 读 `edges.jsonl`（**待办 P2**，retrieve 已用持久边）  
+- [x] 漂移与 As-Is 文档已更新至 2d  
+
+### 2c ✅
+
+- [x] template + preparse + LLM extract + L0/L1 fuzzy  
+- [x] S5 失败回退 rules；`atoms.jsonl`  
+
+### 2d ✅
+
+- [x] supersede + 访问衰减 + retrieve touch  
+- [x] embedding≥0.92 硬合并；0.85–0.92 异步对齐  
+
+### 2e ⏸ 暂缓
+
+- [ ] R4' LLM prune — **不排期**（见 §13）
+
+---
+
+## 13. Phase-2e 暂缓决策（2026-05-24）
+
+**决定**：**暂不实现** retrieve 热路径上的可选 LLM 剪枝（R4'）。
+
+| 维度 | 说明 |
+|------|------|
+| **产品** | AgentTest 技术内网场景下，BM25×能级×weight 已满足联想与路由需求 |
+| **专家** | Q4 已结案：默认 BM25 足够；LLM prune 仅少数高冲突/极含糊场景 |
+| **工程** | 每轮可能双次 retrieve；加热路径 LLM 增加延迟与运维面，边际收益小 |
+| **实测** | 2b～2d 闭环后边界/复杂/LLM store 测试均通过，无「必须 2e」信号 |
+
+**保留**：环境变量 `MEMORY_MCP_RETRIEVE_PRUNE` 文档占位为 `bm25`（默认）；若未来实施须满足：纳入 `RETRIEVE_BUDGET_MS`、失败回退 bm25、禁止多轮 Agent。
+
+**触发再评估**（需观测指标，非单点需求）：hints 多近似 fact 噪声干扰 Plan；多租户共库 BM25 失效；有数据证明 BM25 不足且非 Store/图问题。
 
 ---
 
@@ -533,3 +569,4 @@ AgentTestMemoryMCP/internal/
 |------|------|
 | 2026-05-23 | v1：初版推荐实现方案 |
 | 2026-05-23 | v2：合并专家 Q4–Q6、出度惩罚、防环、L1 Fuzzy、对齐分层、实施批准与 2b 检查清单 |
+| 2026-05-24 | v3：2b～2d 结案；§13 2e 暂缓；§8/§12 进度更新 |

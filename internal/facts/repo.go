@@ -82,7 +82,12 @@ func (r *Repo) ReplaceByCorrelation(correlationID string, newFacts []Fact) error
 		}
 	}
 	kept = append(kept, newFacts...)
-	return r.rewrite(kept)
+	return r.Rewrite(kept)
+}
+
+// Rewrite 全量覆写 facts.jsonl。
+func (r *Repo) Rewrite(fs []Fact) error {
+	return r.rewrite(fs)
 }
 
 func (r *Repo) appendAll(fs []Fact) error {

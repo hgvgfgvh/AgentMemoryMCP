@@ -1,11 +1,12 @@
 # AgentTestMemoryMCP — 当前实现架构说明（As-Is）
 
 > **文档用途**：描述**当前已落地代码**（As-Is），供评审与排障。  
-> **快照日期**：2026-05-23  
-> **实现阶段**：Phase-2a（factworld 规则引擎）+ 伴生开发控制台（3D，只读）  
+> **快照日期**：2026-05-24  
+> **实现阶段**：**Phase-2d**（`phase=2d-factworld`）— 图检索 + LLM Store + 退化/对齐  
 > **宪法**：`DESIGN_INTENT.md`  
-> **批准落地路径**：`MEMORY_AGENT_IMPLEMENTATION_PLAN.md`（2b～2e，**可实施**）  
-> **差距登记**：`ARCHITECTURE_DRIFT.md` §当前阶段
+> **批准落地路径**：`MEMORY_AGENT_IMPLEMENTATION_PLAN.md`（2b～2d **已完成**；2e **暂缓**）  
+> **进度**：`IMPLEMENTATION_PROGRESS.md`  
+> **差距登记**：`ARCHITECTURE_DRIFT.md`
 
 ---
 
@@ -302,19 +303,19 @@ sequenceDiagram
 
 ## 9. 与宪法 / 批准方案的距离
 
-> 完整漂移表见 `ARCHITECTURE_DRIFT.md`。专家评审 **Q4–Q6 已结案**；实施顺序：**2b → 2c → 2d → 2e**。
+> 完整漂移表见 `ARCHITECTURE_DRIFT.md`。专家评审 **Q4–Q6 已结案**；**2b～2d 已对齐宪法**。
 
-| 能力 | 当前 (2a) | 下一里程碑 |
-|------|-----------|------------|
-| 持久图 + Weighted BFS retrieve | 无；Console **推导**边 | **2b**：`edges.jsonl` + 出度惩罚 + 防环 |
-| BM25×能级×weight 剪枝 | 仅 `MatchScore` | **2b** |
-| retrieve 预算 300ms | 无硬超时 | **2b** |
-| Pitfall / 路由抑制 | 未区分 | **2b** |
-| LLM 结构化抽取 + L1 Fuzzy | 仅 `rules.go` | **2c**；S5 失败回退 rules |
-| supersede / embedding 对齐 | 仅 correlation 替换 | **2d** |
-| 可选 retrieve LLM prune | 无 | **2e**（默认 **bm25**） |
-| Host 不挂载 MCP / 字符串协议 | **已满足** | 保持 |
-| 伴生 Console | **已实现** | 2b 读持久边 |
+| 能力 | 当前 (2d) | 备注 |
+|------|-----------|------|
+| 持久图 + Weighted BFS retrieve | ✅ `edges.jsonl` + BFS + 出度惩罚 + 防环 | retrieve 加载持久边 |
+| BM25×能级×weight 剪枝 | ✅ `retrieve/pipeline.go` | 默认 `RETRIEVE_PRUNE=bm25` |
+| retrieve 预算 | ✅ `MEMORY_MCP_RETRIEVE_BUDGET_MS` | 超时降级 |
+| Pitfall / 路由抑制 | ✅ | `exec_simple_match=no` |
+| LLM 结构化抽取 + L1 Fuzzy | ✅ `memoryagent/*` | S5 失败回退 rules |
+| supersede / embedding 对齐 | ✅ `degenerate` + `entity` + `align` | 异步对齐不阻塞 Store |
+| 可选 retrieve LLM prune | ⏸ **暂缓** | 见 `IMPLEMENTATION_PROGRESS.md` §2e |
+| Host 不挂载 MCP / 字符串协议 | ✅ | 保持 |
+| 伴生 Console | ✅ | **P2**：仍由 facts 推导展示边，未直读 `edges.jsonl` |
 
 ---
 
@@ -325,7 +326,7 @@ sequenceDiagram
 3. **测试 seed fact** 长期影响 retrieve（如 boundary-test）。  
 4. **同参工具去重**：Exec-Simple 新 episode 内可能跳过重复 `list_directory`。  
 5. **Verification Gate L2** 在 Host 侧关闭，与记忆路由独立。  
-6. **ARCHITECTURE.md** 部分仍写 Phase-1 stub，以本文与代码为准。
+6. **Console** 拓扑展示与 retrieve 用的 `edges.jsonl` 尚未完全同源（P2）。
 
 ---
 
@@ -361,7 +362,8 @@ sequenceDiagram
 
 | 文档 | 内容 |
 |------|------|
-| `MEMORY_AGENT_IMPLEMENTATION_PLAN.md` | 2b～2e 设计、专家 Q4–Q6 结论、2b 检查清单 |
+| `IMPLEMENTATION_PROGRESS.md` | 2a～2d 完成度、2e 暂缓决策 |
+| `MEMORY_AGENT_IMPLEMENTATION_PLAN.md` | 方案全文、§13 2e 说明 |
 | `DESIGN_INTENT.md` | 宪法：双链路、BM25 默认、Fuzzy L1、对齐边界 |
 | `ACCEPTANCE_RULES.md` | 分阶段可勾选验收项 |
 
@@ -375,3 +377,4 @@ sequenceDiagram
 |------|------|
 | 2026-05-23 | 初版：factworld 2a + 伴生控制台 + AgentTest 集成 |
 | 2026-05-23 | 对齐 v2 方案：§9 路线图、§12 交叉引用、专家结案指向 |
+| 2026-05-24 | 升级至 Phase-2d As-Is；§9 能力表结案；2e 暂缓 |

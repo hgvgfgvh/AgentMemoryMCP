@@ -61,6 +61,7 @@ func ExtractFromEpisode(jobID, source, kind, correlationID, content string) []fa
 		TierHint:      2,
 		Confidence:    conf,
 		Weight:        weight,
+		LastActive:    now,
 		CreatedAt:     now,
 	}
 	return []facts.Fact{f}

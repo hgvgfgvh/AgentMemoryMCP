@@ -13,10 +13,11 @@
 | 文档 | 层级 | 用途 |
 |------|------|------|
 | `DESIGN_INTENT.md` | **宪法** | 不可违背的取舍（本文件） |
-| `MEMORY_AGENT_IMPLEMENTATION_PLAN.md` | **批准方案** | Phase-2b～2e 落地路径与专家结论 |
+| `IMPLEMENTATION_PROGRESS.md` | **进度** | 2a～2d 完成度、2e 暂缓决策 |
+| `MEMORY_AGENT_IMPLEMENTATION_PLAN.md` | **批准方案** | 方案全文；§13 2e 说明 |
 | `ARCHITECTURE.md` | 实现地图 | 模块、契约、阶段（Agent 同步） |
-| `CURRENT_IMPLEMENTATION_ARCHITECTURE.md` | As-Is | 已上线代码说明 |
-| `ARCHITECTURE_DRIFT.md` | 漂移登记 | 宪法 vs 代码差距 |
+| `CURRENT_IMPLEMENTATION_ARCHITECTURE.md` | As-Is | 已上线代码说明（2d） |
+| `ARCHITECTURE_DRIFT.md` | 漂移登记 | 已闭合 vs 待办 |
 | `ACCEPTANCE_RULES.md` | 验收 | 可执行检查清单 |
 | `README.md` | 索引 | 阅读顺序与关系 |
 
@@ -121,8 +122,8 @@
 
 ### 影响
 
-- Phase-2e 才实现可选 LLM prune；2b～2d 验收**不依赖** retrieve LLM。
-- `ARCHITECTURE.md` 与 `ACCEPTANCE_RULES.md` 须体现预算与默认 `bm25`。
+- **2026-05-24**：Phase-2e（可选 LLM prune）**暂缓实施**；v1 生产默认保持 `bm25`。2b～2d 已验收，**不依赖** retrieve LLM。
+- `ARCHITECTURE.md`、`ACCEPTANCE_RULES.md`、`IMPLEMENTATION_PROGRESS.md` 须体现预算与默认 `bm25`。
 
 ---
 

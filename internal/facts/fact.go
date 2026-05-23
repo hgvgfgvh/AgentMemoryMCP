@@ -17,5 +17,8 @@ type Fact struct {
 	TierHint      int       `json:"tier_hint,omitempty"`
 	Confidence    float64   `json:"confidence"`
 	Weight        float64   `json:"weight"`
+	LastActive    time.Time `json:"last_active,omitempty"`
+	AccessCount   int       `json:"access_count,omitempty"`
+	Superseded    bool      `json:"superseded,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 }

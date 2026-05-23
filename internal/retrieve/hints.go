@@ -22,7 +22,7 @@ type ScoredFact struct {
 func Search(all []facts.Fact, context, queryHint string, topK int, minScore float64) []ScoredFact {
 	var scored []ScoredFact
 	for _, f := range all {
-		if f.Weight < 0.1 {
+		if f.Weight < 0.1 || f.Superseded {
 			continue
 		}
 		s := agent.MatchScore(context, queryHint, f)

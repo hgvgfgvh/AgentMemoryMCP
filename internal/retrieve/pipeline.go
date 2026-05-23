@@ -78,7 +78,7 @@ func seedAnchors(all []facts.Fact, contextStr, queryHint string, topN int, minSc
 	}
 	var ranked []pair
 	for _, f := range all {
-		if f.Weight < 0.1 {
+		if f.Weight < 0.1 || f.Superseded {
 			continue
 		}
 		doc := factDoc(f)
@@ -113,7 +113,7 @@ func seedAnchors(all []facts.Fact, contextStr, queryHint string, topN int, minSc
 func pruneComposite(all []facts.Fact, activated map[string]float64, contextStr string, cfg PipelineConfig) []ScoredFact {
 	var scored []ScoredFact
 	for _, f := range all {
-		if f.Weight < 0.1 {
+		if f.Weight < 0.1 || f.Superseded {
 			continue
 		}
 		doc := factDoc(f)

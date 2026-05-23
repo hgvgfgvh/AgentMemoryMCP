@@ -11,7 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"AgentTestMemoryMCP/internal/align"
 	"AgentTestMemoryMCP/internal/atoms"
+	"AgentTestMemoryMCP/internal/degenerate"
 	"AgentTestMemoryMCP/internal/facts"
 	"AgentTestMemoryMCP/internal/filter"
 	"AgentTestMemoryMCP/internal/graph"
@@ -131,6 +133,8 @@ func (e *FactWorldEngine) Retrieve(ctx context.Context, in RetrieveInput) string
 			Phase:   response.PhaseFactWorld(),
 		})
 	}
+	dcfg := degenerate.DefaultConfig()
+	all = degenerate.ApplyStaleDecay(all, time.Now().UTC(), dcfg)
 	ctx2, cancel := context.WithTimeout(ctx, retrieveBudget())
 	defer cancel()
 
@@ -147,6 +151,16 @@ func (e *FactWorldEngine) Retrieve(ctx context.Context, in RetrieveInput) string
 			if len(scored) == 0 {
 				scored = retrieve.Search(all, in.Context, in.QueryHint, e.retrieveTopK, e.retrieveMinScore)
 			}
+		}
+	}
+	hitIDs := make([]string, 0, len(scored))
+	for _, s := range scored {
+		hitIDs = append(hitIDs, s.Fact.ID)
+	}
+	if len(hitIDs) > 0 {
+		all = degenerate.TouchRetrieve(all, hitIDs, time.Now().UTC(), dcfg)
+		if err := e.repo.Rewrite(all); err != nil {
+			log.Printf("[factworld] touch retrieve: %v", err)
 		}
 	}
 	hints := retrieve.BuildHints(scored, e.routeThreshold, in.Context)
@@ -237,8 +251,20 @@ func (e *FactWorldEngine) processJob(jobID string, in StoreInput) error {
 	if err != nil {
 		return err
 	}
-	if err := graph.RebuildEdgesFile(e.dataDir, all); err != nil {
-		log.Printf("[factworld] rebuild edges: %v", err)
+	dcfg := degenerate.DefaultConfig()
+	all = degenerate.ApplyStaleDecay(all, time.Now().UTC(), dcfg)
+	var extra []graph.Edge
+	if len(out.Facts) > 0 && len(out.SupersedeIDs) > 0 {
+		all, extra = degenerate.ApplySupersedes(all, out.Facts[0].ID, out.SupersedeIDs, dcfg)
+		log.Printf("[factworld] supersede %d fact(s) for job %s", len(out.SupersedeIDs), jobID)
+	}
+	if err := e.repo.Rewrite(all); err != nil {
+		return err
+	}
+	align.EnqueueFuzzyPairs(e.dataDir, out.FuzzyPairs)
+	edges := graph.DeriveEdges(all)
+	if err := graph.WriteEdges(e.dataDir, degenerate.MergeExtraEdges(edges, extra)); err != nil {
+		log.Printf("[factworld] write edges: %v", err)
 	}
 	return nil
 }
