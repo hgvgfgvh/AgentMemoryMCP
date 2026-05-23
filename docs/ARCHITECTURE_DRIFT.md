@@ -6,9 +6,25 @@
 
 ---
 
-## 当前阶段：Phase-2b（图 + BFS + BM25，代码已落地）
+## 当前阶段：Phase-2c（LLM 抽取 + L0/L1，代码已落地）
 
-> 2026-05-23：已实现 `internal/graph`、`internal/index/bm25`、`retrieve/pipeline`；Store 重建 `edges.jsonl`；Retrieve 默认图路径（`MEMORY_MCP_RETRIEVE_LEGACY=1` 可回退）。
+> 2026-05-23：已实现 `internal/memoryagent`（template、LLM extract、L0/L1 fuzzy、rules 回退）、`internal/atoms`、`internal/llm`；phase=`2c-factworld`。未配置 `MEMORY_MCP_LLM_API_BASE` 时 Store 自动 rules 回退。
+
+## Phase-2b → 2c 已闭合项
+
+| 设计意图 | 当前实现 | 分类 |
+|----------|----------|------|
+| LLM 结构化抽取（1 次） | `memoryagent.LLMExtract` | `aligned` |
+| S5 失败 → rules Summary | `ProcessEpisode` fallback | `aligned` |
+| L0 防幻觉 | `ValidateL0` | `aligned` |
+| L1 Fuzzy evidence | `EvidenceAnchored` + `ValidateL1` | `aligned` |
+| atoms.jsonl 审计 | `internal/atoms` | `aligned` |
+| template agenttest-plan | embed YAML | `aligned` |
+| L2 冲突 mini LLM | 未实现 | `technical debt` → 2c+ 可选 |
+
+## Phase-2b（retrieve，已落地）
+
+> `internal/graph`、`retrieve/pipeline`；`MEMORY_MCP_RETRIEVE_LEGACY=1` 可回退关键词检索。
 
 ## Phase-2a → 2b 已闭合项
 

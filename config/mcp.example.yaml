@@ -13,3 +13,9 @@ args:
 env:
   MEMORY_MCP_DATA_DIR: "C:\\DATA\\GODATA\\AgentTestMemoryMCP\\data"
   # MEMORY_MCP_ENGINE: factworld   # 与 -engine factworld 等价
+  # Phase-2c LLM 抽取（未配置 API 时自动回退 rules）
+  MEMORY_MCP_LLM_EXTRACT: "1"
+  # MEMORY_MCP_LLM_API_BASE: "https://api.openai.com/v1"
+  # MEMORY_MCP_LLM_API_KEY: "sk-..."
+  # MEMORY_MCP_LLM_MODEL: "gpt-4o-mini"
+  # MEMORY_MCP_LLM_EXTRACT: "0"   # 强制关闭 LLM，仅用规则抽取

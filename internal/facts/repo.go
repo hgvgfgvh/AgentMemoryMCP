@@ -122,7 +122,7 @@ func (r *Repo) rewrite(fs []Fact) error {
 func (r *Repo) Path() string { return r.path }
 
 func EnsureDataDirs(dataDir string) error {
-	for _, sub := range []string{"episodes", "facts", "graph", "jobs/pending", "jobs/done", "jobs/dead", "store_log"} {
+	for _, sub := range []string{"episodes", "facts", "graph", "atoms", "jobs/pending", "jobs/done", "jobs/dead", "store_log"} {
 		if err := os.MkdirAll(filepath.Join(dataDir, sub), 0o755); err != nil {
 			return fmt.Errorf("mkdir %s: %w", sub, err)
 		}

@@ -26,22 +26,9 @@ func ExtractFromEpisode(jobID, source, kind, correlationID, content string) []fa
 	if content == "" {
 		return nil
 	}
-	sections := splitSections(content)
-	userReq := strings.TrimSpace(sections["用户诉求"])
-	portal := strings.TrimSpace(sections["门户回复"])
-	planBlock := sections["计划终态 (TodoList)"]
-	if planBlock == "" {
-		planBlock = sections["计划终态"]
-	}
-
-	outcome := "unknown"
-	if m := reStatusLine.FindStringSubmatch(planBlock + "\n" + content); len(m) >= 2 {
-		outcome = strings.ToLower(strings.TrimSpace(m[1]))
-	}
-	tools := parseListLine(reToolsCalled.FindStringSubmatch(planBlock))
-	artifacts := parseListLine(reArtifacts.FindStringSubmatch(planBlock))
-
-	tags := deriveTags(userReq + " " + portal + " " + planBlock)
+	pp := PreparseEpisode(content)
+	userReq, portal, outcome := pp.UserReq, pp.Portal, pp.Outcome
+	tools, artifacts, tags := pp.Tools, pp.Artifacts, pp.Tags
 	summary := buildSummaryText(userReq, portal, outcome, tools, artifacts)
 	if summary == "" {
 		summary = preview(content, 400)
@@ -131,6 +118,11 @@ func deriveTags(text string) []string {
 	return out
 }
 
+// BuildSummaryFromPreparse 由预解析生成摘要文本。
+func BuildSummaryFromPreparse(pp Preparse) string {
+	return buildSummaryText(pp.UserReq, pp.Portal, pp.Outcome, pp.Tools, pp.Artifacts)
+}
+
 func buildSummaryText(userReq, portal, outcome string, tools, artifacts []string) string {
 	var b strings.Builder
 	if userReq != "" {
@@ -158,6 +150,11 @@ func buildSummaryText(userReq, portal, outcome string, tools, artifacts []string
 		b.WriteString(preview(portal, 160))
 	}
 	return strings.TrimSpace(b.String())
+}
+
+// NormalizeOutcome 规范化 outcome 字符串。
+func NormalizeOutcome(s string) string {
+	return normalizeOutcome(s)
 }
 
 func normalizeOutcome(s string) string {

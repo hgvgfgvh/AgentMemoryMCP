@@ -11,10 +11,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"AgentTestMemoryMCP/internal/agent"
+	"AgentTestMemoryMCP/internal/atoms"
 	"AgentTestMemoryMCP/internal/facts"
 	"AgentTestMemoryMCP/internal/filter"
 	"AgentTestMemoryMCP/internal/graph"
+	"AgentTestMemoryMCP/internal/memoryagent"
 	"AgentTestMemoryMCP/internal/response"
 	"AgentTestMemoryMCP/internal/retrieve"
 )
@@ -196,20 +197,41 @@ func (e *FactWorldEngine) enqueueJob(jobID string, in StoreInput) error {
 }
 
 func (e *FactWorldEngine) processJob(jobID string, in StoreInput) error {
-	newFacts := agent.ExtractFromEpisode(jobID, in.Source, in.Kind, in.CorrelationID, in.Content)
-	if len(newFacts) == 0 {
+	ctx := context.Background()
+	existing, _ := e.repo.List()
+	out := memoryagent.ProcessEpisode(ctx, jobID, in.Source, in.Kind, in.CorrelationID, in.Content, existing)
+	if len(out.Facts) == 0 {
 		return fmt.Errorf("no facts extracted")
 	}
+	atomRepo, err := atoms.NewRepo(e.dataDir)
+	if err != nil {
+		return err
+	}
 	if in.CorrelationID != "" {
-		if err := e.repo.ReplaceByCorrelation(in.CorrelationID, newFacts); err != nil {
+		for _, f := range existing {
+			if f.CorrelationID == in.CorrelationID {
+				_ = atomRepo.RemoveByEpisode(f.EpisodeID)
+			}
+		}
+		if err := e.repo.ReplaceByCorrelation(in.CorrelationID, out.Facts); err != nil {
 			return err
 		}
 	} else {
-		for _, f := range newFacts {
+		for _, f := range out.Facts {
 			if err := e.repo.Append(f); err != nil {
 				return err
 			}
 		}
+	}
+	if len(out.Atoms) > 0 {
+		if err := atomRepo.AppendEpisode(jobID, out.Atoms); err != nil {
+			log.Printf("[factworld] atoms append: %v", err)
+		}
+	}
+	if out.Fallback {
+		log.Printf("[factworld] store job %s: rules fallback (llm off or failed)", jobID)
+	} else {
+		log.Printf("[factworld] store job %s: llm extract atoms_kept=%d dropped=%d", jobID, out.AtomsKept, out.AtomsDrop)
 	}
 	all, err := e.repo.List()
 	if err != nil {
