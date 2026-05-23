@@ -41,14 +41,18 @@ go build -o memory-mcp.exe ./cmd/memory-mcp
 # 同时可打开开发控制台：http://127.0.0.1:8090/console/
 ```
 
-**记忆拓扑开发控制台（只读，与 stdio MCP 并行）：**
+**记忆拓扑开发控制台（MCP 内自闭环）：**
 
-AgentTest 主进程仍用 stdio 挂载 MCP 时，可**另开终端**只读同一 `data` 目录：
+默认 **stdio 启动时自动伴生** HTTP 控制台，无需 Host 额外配置：
+
+- 浏览器：**http://127.0.0.1:8091/console/**
+- `MEMORY_MCP_CONSOLE_LISTEN`：改监听地址（如 `127.0.0.1:8092`）
+- `MEMORY_MCP_CONSOLE_DISABLE=1`：关闭伴生控制台
+
+仅控制台、不跑 MCP stdio 时仍可手动：
 
 ```powershell
-$env:MEMORY_MCP_DATA_DIR = "C:/DATA/GODATA/AgentTestMemoryMCP/data"
-.\memory-mcp.exe -console 127.0.0.1:8091
-# 浏览器打开 http://127.0.0.1:8091/console/
+.\memory-mcp.exe -console 127.0.0.1:8091 -data C:/DATA/GODATA/AgentTestMemoryMCP/data
 ```
 
 - **3D 力导向拓扑图**（three.js + 3d-force-graph）：Fact / Episode / Tag / Tool / Source 及关联边；支持旋转、缩放、平移、搜索聚焦

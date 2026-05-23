@@ -105,11 +105,40 @@ func main() {
 		return
 	}
 
+	if consoleSrv != nil {
+		startConsoleBackground(consoleSrv, dir)
+	}
+
 	t := &mcp.LoggingTransport{Transport: &mcp.StdioTransport{}, Writer: os.Stderr}
-	log.Printf("[memory-mcp] stdio transport (phase-1 stub)")
+	log.Printf("[memory-mcp] stdio transport")
 	if err := server.Run(context.Background(), t); err != nil {
 		log.Fatalf("server: %v", err)
 	}
+}
+
+// startConsoleBackground stdio 模式下由 MCP 进程内伴生启动开发控制台（Host 无感）。
+// 环境变量：MEMORY_MCP_CONSOLE_LISTEN（默认 127.0.0.1:8091）；MEMORY_MCP_CONSOLE_DISABLE=1 关闭。
+func startConsoleBackground(consoleSrv *console.Server, dataDir string) {
+	if envTruthy(os.Getenv("MEMORY_MCP_CONSOLE_DISABLE")) {
+		log.Printf("[memory-mcp] dev console disabled (MEMORY_MCP_CONSOLE_DISABLE)")
+		return
+	}
+	addr := trim(os.Getenv("MEMORY_MCP_CONSOLE_LISTEN"))
+	if addr == "" {
+		addr = "127.0.0.1:8091"
+	}
+	go func() {
+		log.Printf("[memory-mcp] dev console (stdio 伴生) http://%s/console/ data_dir=%s facts=%d",
+			addr, dataDir, consoleSrv.FactsCount())
+		if err := http.ListenAndServe(addr, consoleWithRoot(consoleSrv)); err != nil {
+			log.Printf("[memory-mcp] dev console exit: %v", err)
+		}
+	}()
+}
+
+func envTruthy(v string) bool {
+	v = strings.ToLower(strings.TrimSpace(v))
+	return v == "1" || v == "true" || v == "yes"
 }
 
 func registerTools(server *mcp.Server, eng engine.Engine) {
