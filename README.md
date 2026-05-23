@@ -1,6 +1,6 @@
 # AgentTestMemoryMCP
 
-跨 Host 可复用的**长效事实记忆** MCP Server（第三层记忆）。Phase-1 仅搭建**对外 MCP 架构**；内部记忆 Agent、图结构、向量索引等**未实现**（见 `docs/ARCHITECTURE_DRIFT.md`）。
+跨 Host 可复用的**长效事实记忆** MCP Server（第三层记忆）。当前为 **Phase-2a**（`factworld` 规则引擎 + `facts.jsonl` + 关键词 retrieve + 伴生开发控制台）；持久图 / BM25 / LLM 抽取等按批准方案推进（见 [`docs/README.md`](docs/README.md)）。
 
 ## 工具（字符串协议）
 
@@ -9,7 +9,7 @@
 | `memory_store` | 存入：`content`（必填），`source` / `kind` / `correlation_id`（可选）。返回 **JSON 字符串**（`accepted`、`job_id`、`skipped` 等均为 string）。 |
 | `memory_retrieve` | 取出：`context`（必填），`query_hint`（可选）。返回 **JSON 字符串**（`hints`、`skipped` 等均为 string）。 |
 
-宪法与设计意图：[`docs/DESIGN_INTENT.md`](docs/DESIGN_INTENT.md)
+文档入口：[`docs/README.md`](docs/README.md) · 宪法：[`docs/DESIGN_INTENT.md`](docs/DESIGN_INTENT.md) · 落地：[`docs/MEMORY_AGENT_IMPLEMENTATION_PLAN.md`](docs/MEMORY_AGENT_IMPLEMENTATION_PLAN.md)
 
 ## 构建与运行
 

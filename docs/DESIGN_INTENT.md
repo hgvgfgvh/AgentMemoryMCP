@@ -2,7 +2,23 @@
 
 本仓库 **AgentTestMemoryMCP** 为独立的**长效事实记忆 MCP** 服务工程。本文档为**记忆系统 MCP** 及对接 Host 的顶层宪法；实现可以演进，但不得违背此处记录的取舍。
 
-> Agent 同步 `ARCHITECTURE.md` 时须以本文件为准绳。当前实现若与本文冲突，记入 `ARCHITECTURE_DRIFT.md` 待人工裁定，不得用「现有代码」自动覆盖本文。
+> Agent 同步 `ARCHITECTURE.md` 时须以本文件为准绳。当前实现若与本文冲突，记入 `ARCHITECTURE_DRIFT.md` 待人工裁定，不得用「现有代码」自动覆盖本文。  
+> **目标态落地路径**（已专家评审批准）：`MEMORY_AGENT_IMPLEMENTATION_PLAN.md`。  
+> **当前实现快照**：`CURRENT_IMPLEMENTATION_ARCHITECTURE.md`。
+
+---
+
+## 文档体系（本目录）
+
+| 文档 | 层级 | 用途 |
+|------|------|------|
+| `DESIGN_INTENT.md` | **宪法** | 不可违背的取舍（本文件） |
+| `MEMORY_AGENT_IMPLEMENTATION_PLAN.md` | **批准方案** | Phase-2b～2e 落地路径与专家结论 |
+| `ARCHITECTURE.md` | 实现地图 | 模块、契约、阶段（Agent 同步） |
+| `CURRENT_IMPLEMENTATION_ARCHITECTURE.md` | As-Is | 已上线代码说明 |
+| `ARCHITECTURE_DRIFT.md` | 漂移登记 | 宪法 vs 代码差距 |
+| `ACCEPTANCE_RULES.md` | 验收 | 可执行检查清单 |
+| `README.md` | 索引 | 阅读顺序与关系 |
 
 ---
 
@@ -43,9 +59,9 @@
 
 - 记忆在逻辑上可单独看作一个**事实世界（Fact World）**。
 - **记忆系统 Agent**（内部实现，对外无感）专职：
-  - 从外部存入的字符串中**抽取 / 归一化**事实点；
-  - 维护事实点之间的**图结构**（节点、索引、关联边）；
-  - 执行**退化**（重要性、久未访问、冲突合并、过期策略等）。
+  - 从外部存入的字符串中**抽取 / 归一化**事实点（含原子三元组，见 Phase-2）；
+  - 维护事实点之间的**图结构**（节点、边、索引、关联）；
+  - 执行**退化**（重要性、久未访问、冲突合并、`supersedes`、过期策略等）。
 - 外部系统**只提交事实材料**，**不负责**建立或维护关系；关系管理 exclusively 在 MCP 内部。
 
 ### 原因
@@ -56,7 +72,97 @@
 ### 影响
 
 - 禁止在 MCP 工具层暴露「建边 / 删节点 / 改图」等细粒度 API 给 Host。
-- 内部可有多阶段流水线（解析 → 去重 → 连边 → 索引），但对外仍只有 **store / retrieve**。
+- 内部可有多阶段流水线（解析 → 去重 → 连边 → 索引 → 退化），但对外仍只有 **store / retrieve**。
+
+---
+
+## 2026-05-23 — 双链路范式：原子消解 + 拓扑激活（Phase-2+）
+
+### 设计意图
+
+记忆系统内部分为两条正交链路，**对外契约不变**：
+
+| 链路 | 时机 | 核心能力 | LLM 默认 |
+|------|------|----------|----------|
+| **原子消解** | Store 异步 | 结构化抽取 → 实体对齐 → 合并/退化 → 持久化 `facts` + `edges` | Store **至多 1 次**抽取；失败**必须**回退规则单条 Summary |
+| **拓扑激活** | Retrieve 同步 | 种子锚定 → Weighted BFS（1～2 hop）→ 剪枝 → hints + memory-route | Retrieve **默认无 LLM** |
+
+- **Summary Fact**（人类可读、Host hints）与 **Atomic Triple**（图扩散）可双轨并存；Host 仍只消费字符串 hints。
+- 图存储在 MCP 内：`facts.jsonl` + `edges.jsonl`，**每次 retrieve 构建内存邻接表**；不引入 Host 可见图 API，**默认不引入** Neo4j 等外置图库。
+
+### 原因
+
+- 纯关键词检索无法「A 联想 B」；纯 LLM retrieve 违反「取快」且不稳定。
+- 拓扑扩散在召回阶段注入结构关联，优于单向量/关键词。
+
+### 影响
+
+- 实现须先打通 **2b 无 LLM 基准线**（持久边 + BFS + BM25 剪枝），再叠加 Store LLM（2c）与对齐/退化（2d）。
+- 详见 `MEMORY_AGENT_IMPLEMENTATION_PLAN.md` §2～§8。
+
+---
+
+## 2026-05-23 — Retrieve 热路径：确定性优先
+
+### 设计意图
+
+- **默认剪枝**：`BM25(context) × 激活能级(activatedEnergy) × fact.weight` 复合打分，取 Top-K hints。
+- **禁止**在 retrieve 热路径默认调用强模型或多轮 Agent / ReAct。
+- **同步总预算**：建议 **300ms**（`MEMORY_MCP_RETRIEVE_BUDGET_MS`）；超时 → 空或弱 hints，**不阻断** Host。
+- **Weighted BFS** 须含工程护栏：
+  - **出度惩罚**：经 hub 节点（如通用工具名、泛化状态）时能量衰减，避免半图被激活；
+  - **防环**：`visited` 或路径去重，防止 `similar` 等双向边死循环。
+- **LLM 剪枝（R4'）**：仅配置开启（`RETRIEVE_PRUNE=llm`），且仅适用于专家认定的少数场景（10+ 强冲突候选、极含糊/反讽意图等）；超时**回退** BM25。
+
+### 原因
+
+- AgentTest 等技术内网场景：BM25 复合打分比 1B～3B mini 模型更稳定、无时延抖动。
+- 拓扑已在召回阶段融入结构信息，retrieve 阶段 LLM 非默认刚需。
+
+### 影响
+
+- Phase-2e 才实现可选 LLM prune；2b～2d 验收**不依赖** retrieve LLM。
+- `ARCHITECTURE.md` 与 `ACCEPTANCE_RULES.md` 须体现预算与默认 `bm25`。
+
+---
+
+## 2026-05-23 — Store 链：LLM 与实体对齐边界
+
+### 设计意图
+
+| 能力 | 规则 |
+|------|------|
+| **结构化抽取** | 异步 **1 次** LLM（可关）；JSON 非法/超时 → **完整回退**现网规则单条 Summary Fact |
+| **实体对齐 L0** | 硬规则：`lower` + `trim` + 可选去版本号 → 稳定 `nodeID` |
+| **实体对齐 L1** | Embedding **cosine ≥ 0.92** 自动合并；**禁止** Store 主链同步等待 LLM 对齐 |
+| **实体对齐 L2** | 仅 **0.85 < cosine < 0.92** 且高频节点 → **异步增量** mini LLM（2d），不得阻塞 S5～S10 |
+| **防幻觉 L0** | tools/artifacts/outcome ⊆ 规则预解析 |
+| **防幻觉 L1** | evidence 与 episode **Fuzzy 锚定**（禁止裸 `strings.Contains`）；阈值约 **85%** 字符/Token 重合 |
+| **防幻觉 L2** | 与高 weight 事实冲突时 mini LLM 三选一；无法判定 → **共存** + 降 confidence |
+| **退化** | `supersedes` 边 + weight 衰减 + 久未访问衰减；逻辑删除/降权，**不**物理抹除 `episodes/` |
+
+### 原因
+
+- Store 主链默认 LLM 对齐会摧毁吞吐与成本。
+- LLM 抽取 evidence 常有标点/大小写微调，硬子串误判率过高。
+
+### 影响
+
+- `ACCEPTANCE_RULES.md` Phase-2c 须覆盖 L1 fuzzy；Phase-2d 须验证 Store 不因对齐队列阻塞。
+
+---
+
+## 2026-05-23 — 负反馈（Pitfall）与路由
+
+### 设计意图
+
+- `outcome=failed`、ProcessError、计划失败等须能写入 **pitfall** 类事实或边。
+- Retrieve 时 pitfall 须能**抑制** Host `exec_simple_match=yes`（经 `---memory-route---`）。
+- 拓扑扩散经 pitfall 边时**额外衰减**；是否禁止 pitfall 向外扩散由实现调参，默认允许低能级拉出避坑联想。
+
+### 影响
+
+- Phase-2b 起 pitfall 进入持久图与 BM25 剪枝惩罚项（见实现方案 §5.4）。
 
 ---
 
@@ -89,8 +195,8 @@
 |------|------|------|
 | `hints` | string | 记忆系统 Agent 裁切后的**参考提示文本**，供 Host 注入 system/user 前缀；**不**默认返回整图或全量匹配节点。 |
 
-- **语义**：在掌握 `context` 后，由记忆 Agent **自主决定**返回哪些事实（兼顾「只匹配关键词不够」与「全匹配过多」）。
-- **性能**：取出**必须快**；热路径禁止完整 Memory Agent 多轮推理（可用索引 + 轻量 rerank；重型推理仅 store 异步路径）。
+- **语义**：在掌握 `context` 后，由记忆系统**裁切**返回哪些事实（关键词 + 拓扑激活 + 复合打分；非默认 LLM 推理全图）。
+- **性能**：取出**必须快**；热路径禁止多轮 Memory Agent。
 
 ### 原因
 
@@ -143,10 +249,11 @@
 - **形态**：将上述材料序列化为 **单一 `content` 字符串**（Markdown 或 JSON 文本均可）。
 - **示例首行标签（可选）**：`[source=agenttest-plan turn=<id> plan=<id>]`，便于 MCP 内过滤与去重。
 
-AgentTest 对接要点（记入 drift / ARCHITECTURE 时可展开）：
+AgentTest 对接要点：
 
 - 钩子落点：`portal.RunRouterTurn`（Web / stdin / Community 统一入口）。
 - `retrieve` 的 `context` 可拼接：用户本轮 input + `sessionmemory.PrepareUserContext` 产出（第一层）+ 可选上轮 outcome 一行摘要。
+- **DecideRoute** 可第二次 `memory_retrieve` 解析 `---memory-route---`（Exec-Simple）；阈值与 tier 护栏留在 Host。
 
 ---
 
@@ -157,9 +264,11 @@ AgentTest 对接要点（记入 drift / ARCHITECTURE 时可展开）：
 | 路径 | 过滤 | SLA |
 |------|------|-----|
 | Store | Host 规则（长度、寒暄表）+ MCP 内记忆 Agent / 规则二次取舍 | 异步；失败可重试、死信；不阻塞用户门户 |
-| Retrieve | Host 轻过滤 + MCP 内快速索引 | 同步；超时则返回空 `hints`，**不得**阻断 Host 主流程 |
+| Retrieve | Host 轻过滤 + MCP 内快速索引 + 拓扑激活 | 同步；**预算内**完成；超时则空 `hints`，**不得**阻断 Host 主流程 |
 
-**退化**：事实世界须支持长期运行下的合并、降权、删除策略；具体算法由实现决定，但须可配置且可观测（日志 / 指标）。
+**退化**：事实世界须支持长期运行下的合并、降权、`supersedes`、删除策略；具体算法由实现决定，但须可配置且可观测（日志 / 指标）。
+
+**冷启动降级**：LLM 抽取失败时，系统仍须能写入至少一条 Summary Fact（规则路径），保证线性 RAG 底座可用。
 
 ### 影响
 
@@ -182,26 +291,31 @@ AgentTest 对接要点（记入 drift / ARCHITECTURE 时可展开）：
 
 ---
 
-## 文档与护栏（ai-architecture-harness）
+## 2026-05-23 — 开发控制台（伴生 HTTP）
 
-本仓库后续应补齐（可分批）：
+### 设计意图
 
-```text
-AGENTS.md                 # 运行时说明（tools 摘要、非宪法）
-docs/DESIGN_INTENT.md     # 本文件
-docs/ARCHITECTURE.md      # 实现地图（Agent 同步）
-docs/ACCEPTANCE_RULES.md  # 可验收规则（取快、存异步、字符串协议等）
-docs/GOLDEN_RULES.md      # 事故驱动的硬规则
-docs/ARCHITECTURE_DRIFT.md
-```
+- stdio 生产模式下可**伴生**只读 HTTP 控制台（默认 `127.0.0.1:8091`），用于拓扑可视化与检索调试。
+- 控制台**不参与** store/retrieve 业务逻辑；Host **无需**配置控制台地址。
+- 可通过 `MEMORY_MCP_CONSOLE_DISABLE=1` 关闭。
 
-**不可违背的验收锚点（摘要）**
+### 影响
+
+- 控制台数据源须与线上一致（Phase-2b 起读 `edges.jsonl` 等持久图，见实现方案）。
+
+---
+
+## 不可违背的验收锚点（摘要）
 
 1. `memory_store` / `memory_retrieve` 的必填参数均为 **string** 类型语义。
 2. Retrieve 同步路径有**超时上限**且失败不阻断 Host。
-3. Store 默认**异步** ACK。
+3. Store 默认**异步** ACK；LLM 失败须可回退规则 Summary。
 4. 无 Host 可见的图编辑 API。
 5. 执行 Agent 能力目录中**不出现**本 MCP 工具名。
+6. Retrieve **默认**无 LLM；Store 主链**默认**无同步 LLM 实体对齐。
+7. Pitfall / 失败经验须可进入事实库并影响路由提示。
+
+完整可执行项见 `ACCEPTANCE_RULES.md`。
 
 ---
 
@@ -209,4 +323,5 @@ docs/ARCHITECTURE_DRIFT.md
 
 | 日期 | 说明 |
 |------|------|
-| 2026-05-20 | 初版：第三层记忆 MCP、记忆 Agent、字符串协议、Host 钩子、轮次边界、AgentTest episode 参考实践。 |
+| 2026-05-20 | 初版：第三层记忆 MCP、记忆 Agent、字符串协议、Host 钩子、轮次边界。 |
+| 2026-05-23 | 合并专家评审：双链路范式、Retrieve 确定性/BM25/BFS 护栏、Store 对齐与 L1 Fuzzy、Pitfall、控制台、文档体系索引。 |
