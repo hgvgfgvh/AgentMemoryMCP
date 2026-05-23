@@ -11,6 +11,7 @@ type Fact struct {
 	Text          string    `json:"text"`
 	Tags          []string  `json:"tags,omitempty"`
 	Outcome       string    `json:"outcome,omitempty"` // success | fail | unknown
+	IsPitfall     bool      `json:"is_pitfall,omitempty"`
 	Tools         []string  `json:"tools,omitempty"`
 	Artifacts     []string  `json:"artifacts,omitempty"`
 	TierHint      int       `json:"tier_hint,omitempty"`

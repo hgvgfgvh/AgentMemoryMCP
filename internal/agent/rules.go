@@ -52,6 +52,14 @@ func ExtractFromEpisode(jobID, source, kind, correlationID, content string) []fa
 	if outcome == "completed" || outcome == "success" {
 		conf = 0.9
 	}
+	normOutcome := normalizeOutcome(outcome)
+	weight := 1.0
+	isPitfall := false
+	if normOutcome == "fail" {
+		isPitfall = true
+		weight = 0.3
+		conf = 0.75
+	}
 	f := facts.Fact{
 		ID:            fmt.Sprintf("fact-%d-%s", now.UnixNano(), preview(jobID, 12)),
 		EpisodeID:     jobID,
@@ -59,12 +67,13 @@ func ExtractFromEpisode(jobID, source, kind, correlationID, content string) []fa
 		CorrelationID: correlationID,
 		Text:          summary,
 		Tags:          tags,
-		Outcome:       normalizeOutcome(outcome),
+		Outcome:       normOutcome,
+		IsPitfall:     isPitfall,
 		Tools:         tools,
 		Artifacts:     artifacts,
 		TierHint:      2,
 		Confidence:    conf,
-		Weight:        1.0,
+		Weight:        weight,
 		CreatedAt:     now,
 	}
 	return []facts.Fact{f}

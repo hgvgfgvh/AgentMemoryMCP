@@ -6,7 +6,33 @@
 
 ---
 
-## 当前阶段：Phase-2a（factworld 规则引擎）
+## 当前阶段：Phase-2b（图 + BFS + BM25，代码已落地）
+
+> 2026-05-23：已实现 `internal/graph`、`internal/index/bm25`、`retrieve/pipeline`；Store 重建 `edges.jsonl`；Retrieve 默认图路径（`MEMORY_MCP_RETRIEVE_LEGACY=1` 可回退）。
+
+## Phase-2a → 2b 已闭合项
+
+| 设计意图 | 当前实现 | 分类 |
+|----------|----------|------|
+| 持久图 + BFS retrieve | `graph/edges.jsonl` + WeightedBFS | `aligned` |
+| BM25 复合剪枝 | `retrieve.SearchWithGraph` | `aligned` |
+| BFS 出度惩罚 + 防环 | `graph/bfs.go` + 单测 | `aligned` |
+| Pitfall 抑制路由 | `IsPitfall` + `BuildHints` | `aligned` |
+| retrieve 预算 | `MEMORY_MCP_RETRIEVE_BUDGET_MS` | `aligned` |
+
+## 仍待 Phase-2c～2e
+
+| 设计意图 | 状态 |
+|----------|------|
+| LLM 结构化抽取 | 待 2c |
+| L1 Fuzzy evidence | 待 2c |
+| embedding 对齐 / supersede 退化 | 待 2d |
+| 可选 retrieve LLM prune | 待 2e |
+| 控制台读持久 `edges.jsonl`（优先于推导） | 待增强 |
+
+---
+
+## 历史：Phase-2a（factworld 规则引擎）
 
 | 设计意图（宪法） | 当前实现 | 分类 | 目标阶段 / 说明 |
 |------------------|----------|------|-----------------|

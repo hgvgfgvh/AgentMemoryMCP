@@ -40,7 +40,7 @@ func Search(all []facts.Fact, context, queryHint string, topK int, minScore floa
 }
 
 // BuildHints 组装自然语言 hints + memory-route JSON 块。
-func BuildHints(scored []ScoredFact, routeThreshold float64) string {
+func BuildHints(scored []ScoredFact, routeThreshold float64, contextStr string) string {
 	if len(scored) == 0 {
 		return "【跨会话事实参考】\n(无匹配事实；事实库为空或未达阈值。)\n"
 	}
@@ -66,11 +66,15 @@ func BuildHints(scored []ScoredFact, routeThreshold float64) string {
 
 	match := "no"
 	conf := top.Score
-	out := strings.ToLower(top.Fact.Outcome)
-	if top.Score >= routeThreshold && (out == "success" || out == "completed") {
-		match = "yes"
-		if top.Fact.Confidence > conf {
-			conf = top.Fact.Confidence
+	if pitfallBlocksRoute(scored, contextStr) {
+		match = "no"
+	} else {
+		out := strings.ToLower(top.Fact.Outcome)
+		if top.Score >= routeThreshold && (out == "success" || out == "completed") && !top.Fact.IsPitfall {
+			match = "yes"
+			if top.Fact.Confidence > conf {
+				conf = top.Fact.Confidence
+			}
 		}
 	}
 	route := map[string]any{
@@ -88,6 +92,18 @@ func BuildHints(scored []ScoredFact, routeThreshold float64) string {
 		b.WriteString(fmt.Sprintf("\n[exec_simple_match=yes confidence=%.2f]", conf))
 	}
 	return b.String()
+}
+
+func pitfallBlocksRoute(scored []ScoredFact, contextStr string) bool {
+	for _, s := range scored {
+		if !s.Fact.IsPitfall && s.Fact.Outcome != "fail" && s.Fact.Outcome != "failed" {
+			continue
+		}
+		if agent.MatchScore(contextStr, "", s.Fact) >= 0.35 {
+			return true
+		}
+	}
+	return false
 }
 
 func preview(s string, max int) string {

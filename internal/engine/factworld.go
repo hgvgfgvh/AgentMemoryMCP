@@ -14,11 +14,12 @@ import (
 	"AgentTestMemoryMCP/internal/agent"
 	"AgentTestMemoryMCP/internal/facts"
 	"AgentTestMemoryMCP/internal/filter"
+	"AgentTestMemoryMCP/internal/graph"
 	"AgentTestMemoryMCP/internal/response"
 	"AgentTestMemoryMCP/internal/retrieve"
 )
 
-// FactWorldEngine Phase-2a：规则抽取 + JSONL 事实库 + 关键词检索。
+// FactWorldEngine Phase-2b：规则抽取 + 持久图 + BFS + BM25 检索。
 type FactWorldEngine struct {
 	dataDir          string
 	repo             *facts.Repo
@@ -113,7 +114,6 @@ func (e *FactWorldEngine) Store(ctx context.Context, in StoreInput) string {
 }
 
 func (e *FactWorldEngine) Retrieve(ctx context.Context, in RetrieveInput) string {
-	_ = ctx
 	if skip, reason := filter.ShouldSkipRetrieve(in.Context); skip {
 		return response.FormatRetrieve(response.RetrievePayload{
 			Hints:      "",
@@ -130,8 +130,25 @@ func (e *FactWorldEngine) Retrieve(ctx context.Context, in RetrieveInput) string
 			Phase:   response.PhaseFactWorld(),
 		})
 	}
-	scored := retrieve.Search(all, in.Context, in.QueryHint, e.retrieveTopK, e.retrieveMinScore)
-	hints := retrieve.BuildHints(scored, e.routeThreshold)
+	ctx2, cancel := context.WithTimeout(ctx, retrieveBudget())
+	defer cancel()
+
+	var scored []retrieve.ScoredFact
+	if useLegacyRetrieve() {
+		scored = retrieve.Search(all, in.Context, in.QueryHint, e.retrieveTopK, e.retrieveMinScore)
+	} else {
+		mg, gerr := graph.LoadOrDerive(e.dataDir, all)
+		if gerr != nil {
+			scored = retrieve.Search(all, in.Context, in.QueryHint, e.retrieveTopK, e.retrieveMinScore)
+		} else {
+			pcfg := retrieve.DefaultPipelineConfig(e.routeThreshold, e.retrieveTopK, e.retrieveMinScore)
+			scored = retrieve.SearchWithGraph(ctx2, all, mg, in.Context, in.QueryHint, pcfg)
+			if len(scored) == 0 {
+				scored = retrieve.Search(all, in.Context, in.QueryHint, e.retrieveTopK, e.retrieveMinScore)
+			}
+		}
+	}
+	hints := retrieve.BuildHints(scored, e.routeThreshold, in.Context)
 	return response.FormatRetrieve(response.RetrievePayload{
 		Hints:   hints,
 		Skipped: "false",
@@ -184,12 +201,22 @@ func (e *FactWorldEngine) processJob(jobID string, in StoreInput) error {
 		return fmt.Errorf("no facts extracted")
 	}
 	if in.CorrelationID != "" {
-		return e.repo.ReplaceByCorrelation(in.CorrelationID, newFacts)
-	}
-	for _, f := range newFacts {
-		if err := e.repo.Append(f); err != nil {
+		if err := e.repo.ReplaceByCorrelation(in.CorrelationID, newFacts); err != nil {
 			return err
 		}
+	} else {
+		for _, f := range newFacts {
+			if err := e.repo.Append(f); err != nil {
+				return err
+			}
+		}
+	}
+	all, err := e.repo.List()
+	if err != nil {
+		return err
+	}
+	if err := graph.RebuildEdgesFile(e.dataDir, all); err != nil {
+		log.Printf("[factworld] rebuild edges: %v", err)
 	}
 	return nil
 }
