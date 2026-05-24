@@ -32,6 +32,19 @@
         if (!r.ok) throw new Error("stats API " + r.status);
         return r.json();
       }),
+    mcpRetrieve: (context, queryHint) =>
+      fetch("/console/api/mcp_retrieve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context: context, query_hint: queryHint || "" }),
+      }).then((r) => {
+        if (!r.ok) {
+          return r.json().then((j) => {
+            throw new Error(j.error || "mcp_retrieve API " + r.status);
+          });
+        }
+        return r.json();
+      }),
   };
 
   let graph3d = null;
@@ -313,6 +326,106 @@
       if (searchInput.value.trim().length >= 2) runSearch();
     }, 400);
   });
+  const retrievePanel = document.getElementById("mcpRetrievePanel");
+  const retrieveBody = document.getElementById("mcpRetrieveBody");
+  const retrieveContext = document.getElementById("retrieveContext");
+  const retrieveQueryHint = document.getElementById("retrieveQueryHint");
+  const retrieveOutput = document.getElementById("retrieveOutput");
+  const retrieveStatus = document.getElementById("retrieveStatus");
+
+  function syncRetrievePanelHeight() {
+    if (!retrievePanel || retrievePanel.classList.contains("collapsed")) {
+      document.documentElement.style.setProperty("--retrieve-panel-h", "52px");
+      return;
+    }
+    const h = retrievePanel.offsetHeight;
+    document.documentElement.style.setProperty("--retrieve-panel-h", h + "px");
+  }
+
+  async function runMCPRetrieve() {
+    const ctx = retrieveContext.value.trim();
+    if (!ctx) {
+      retrieveStatus.textContent = "请填写 context";
+      return;
+    }
+    retrieveStatus.textContent = "检索中…";
+    retrieveOutput.classList.add("hidden");
+    try {
+      const res = await API.mcpRetrieve(ctx, retrieveQueryHint.value.trim());
+      const mcp = res.mcp || {};
+      const route = res.route;
+      let html =
+        '<div class="meta-row">' +
+        "<span>phase: <strong>" +
+        escapeHtml(mcp.phase || "") +
+        "</strong></span>" +
+        "<span>skipped: " +
+        escapeHtml(mcp.skipped || "false") +
+        "</span>" +
+        "<span>engine: " +
+        escapeHtml(res.engine || "") +
+        "</span>" +
+        "<span>" +
+        (res.duration_ms != null ? res.duration_ms + " ms" : "") +
+        "</span></div>";
+      if (mcp.skip_reason) {
+        html += '<p class="meta-row">skip_reason: ' + escapeHtml(mcp.skip_reason) + "</p>";
+      }
+      if (route) {
+        const yes = route.exec_simple_match === "yes";
+        html +=
+          '<p><span class="route-badge ' +
+          (yes ? "yes" : "no") +
+          '">exec_simple_match=' +
+          escapeHtml(route.exec_simple_match || "?") +
+          "</span> " +
+          "confidence=" +
+          (route.confidence != null ? route.confidence.toFixed(3) : "?") +
+          (route.fact_ids && route.fact_ids.length
+            ? " · fact_ids=" + escapeHtml(route.fact_ids.join(", "))
+            : "") +
+          "</p>";
+      }
+      html += "<h3>【跨会话事实参考】正文</h3><pre>" + escapeHtml(res.hints_body || mcp.hints || "") + "</pre>";
+      html += "<h3>MCP 原始 JSON</h3><pre>" + escapeHtml(JSON.stringify(mcp, null, 2)) + "</pre>";
+      if (res.note) {
+        html += '<p class="meta-row">' + escapeHtml(res.note) + "</p>";
+      }
+      retrieveOutput.innerHTML = html;
+      retrieveOutput.classList.remove("hidden");
+      retrieveStatus.textContent = "完成";
+      if (route && route.fact_ids && route.fact_ids.length) {
+        highlightIds = new Set(route.fact_ids.map((id) => "fact:" + id));
+        if (graph3d) graph3d.nodeColor((n) => nodeColor(n.group, n.id));
+        const nid = "fact:" + route.fact_ids[0];
+        if (nodeById[nid]) focusNode(nid);
+      }
+    } catch (e) {
+      retrieveStatus.textContent = "失败";
+      retrieveOutput.innerHTML = '<pre class="err">' + escapeHtml(e.message) + "</pre>";
+      retrieveOutput.classList.remove("hidden");
+    }
+    syncRetrievePanelHeight();
+  }
+
+  document.getElementById("retrieveRunBtn").addEventListener("click", runMCPRetrieve);
+  document.getElementById("retrieveSampleBtn").addEventListener("click", () => {
+    retrieveContext.value =
+      "【跨会话事实参考】\n(无)\n\n---\n用户本轮输入:\n列出 WorkSpace 目录下的文件，把清单保存到 WorkSpace/dev_retrieve_test.txt";
+    retrieveQueryHint.value = "列出 WorkSpace 目录";
+  });
+  document.getElementById("toggleRetrievePanel").addEventListener("click", () => {
+    retrievePanel.classList.toggle("collapsed");
+    const collapsed = retrievePanel.classList.contains("collapsed");
+    document.getElementById("toggleRetrievePanel").textContent = collapsed ? "展开" : "收起";
+    syncRetrievePanelHeight();
+  });
+
+  window.addEventListener("load", syncRetrievePanelHeight);
+  if (typeof ResizeObserver !== "undefined" && retrievePanel) {
+    new ResizeObserver(syncRetrievePanelHeight).observe(retrievePanel);
+  }
+
   document.getElementById("physicsToggle").addEventListener("change", (e) => {
     if (!graph3d) return;
     if (e.target.checked) graph3d.resumeAnimation();

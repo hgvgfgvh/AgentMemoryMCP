@@ -14,8 +14,8 @@
       <span class="phase">factworld · 开发控制台</span>
     </div>
     <div class="search-wrap">
-      <input type="search" id="searchInput" placeholder="搜索记忆节点：事实 ID、正文、标签、工具、correlation…" autocomplete="off" />
-      <button type="button" id="searchBtn">搜索</button>
+      <input type="search" id="searchInput" placeholder="拓扑节点搜索（ID/标签/工具…）" autocomplete="off" />
+      <button type="button" id="searchBtn">节点搜索</button>
       <button type="button" id="clearSearchBtn" class="ghost" title="清除高亮">清除</button>
     </div>
     <div class="actions">
@@ -27,7 +27,31 @@
 
   <div id="searchResults" class="search-results hidden"></div>
 
-  <main class="layout">
+  <section class="mcp-retrieve-panel" id="mcpRetrievePanel">
+    <div class="mcp-retrieve-head">
+      <div>
+        <h2>模拟 memory_retrieve</h2>
+        <p class="sub">与 MCP 对外工具相同引擎（BFS + BM25）；用于评估 hints / 路由质量</p>
+      </div>
+      <button type="button" id="toggleRetrievePanel" class="ghost">收起</button>
+    </div>
+    <div class="mcp-retrieve-body" id="mcpRetrieveBody">
+      <div class="mcp-retrieve-form">
+        <label for="retrieveContext">context <span class="req">必填</span></label>
+        <textarea id="retrieveContext" rows="4" placeholder="本轮完整上下文字符串（与 Host OnTurnRetrieve 传入的 context 同类）"></textarea>
+        <label for="retrieveQueryHint">query_hint <span class="opt">可选</span></label>
+        <input type="text" id="retrieveQueryHint" placeholder="补充检索意图，如用户诉求摘要" />
+        <div class="mcp-retrieve-actions">
+          <button type="button" id="retrieveRunBtn">执行 MCP 检索</button>
+          <button type="button" id="retrieveSampleBtn" class="ghost">填入示例</button>
+          <span id="retrieveStatus" class="retrieve-status"></span>
+        </div>
+      </div>
+      <div id="retrieveOutput" class="mcp-retrieve-output hidden"></div>
+    </div>
+  </section>
+
+  <main class="layout layout-with-retrieve">
     <aside class="legend">
       <h2>节点类型</h2>
       <ul>

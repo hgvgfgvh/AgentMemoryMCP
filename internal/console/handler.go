@@ -41,6 +41,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/graph", s.handleGraph)
 	mux.HandleFunc("/api/search", s.handleSearch)
+	mux.HandleFunc("/api/mcp_retrieve", s.handleMCPRetrieve)
 	mux.HandleFunc("/api/stats", s.handleStats)
 
 	webRoot, err := fs.Sub(webFS, "web")

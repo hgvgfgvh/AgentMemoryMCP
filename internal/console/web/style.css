@@ -100,11 +100,130 @@ button.ghost {
 .search-results .hit:hover { background: var(--bg); }
 .search-results .hit .meta { color: var(--muted); font-size: 0.75rem; }
 
-.layout {
+.mcp-retrieve-panel {
+  margin: 0 12px 8px;
+  padding: 12px 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.mcp-retrieve-panel.collapsed .mcp-retrieve-body { display: none; }
+
+.mcp-retrieve-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mcp-retrieve-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.mcp-retrieve-head .sub {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.mcp-retrieve-form label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin: 8px 0 4px;
+}
+
+.mcp-retrieve-form label .req { color: #e06c75; }
+.mcp-retrieve-form label .opt { color: var(--muted); }
+
+.mcp-retrieve-form textarea,
+.mcp-retrieve-form input[type="text"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.mcp-retrieve-form textarea { resize: vertical; min-height: 72px; }
+
+.mcp-retrieve-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.retrieve-status {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.mcp-retrieve-output {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  font-size: 0.8rem;
+}
+
+.mcp-retrieve-output.hidden { display: none; }
+
+.mcp-retrieve-output .meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.mcp-retrieve-output .route-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.mcp-retrieve-output .route-badge.yes { background: #1e3d2f; color: var(--fact); }
+.mcp-retrieve-output .route-badge.no { background: #3d2a1e; color: var(--tool); }
+
+.mcp-retrieve-output pre {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.mcp-retrieve-output h3 {
+  margin: 12px 0 6px;
+  font-size: 0.8rem;
+  color: var(--accent);
+}
+
+.layout,
+.layout-with-retrieve {
   display: grid;
   grid-template-columns: 200px 1fr 280px;
   gap: 0;
   height: calc(100vh - 56px);
+}
+
+.layout-with-retrieve {
+  height: calc(100vh - 56px - var(--retrieve-panel-h, 220px));
+  min-height: 320px;
 }
 
 .legend, .detail {
