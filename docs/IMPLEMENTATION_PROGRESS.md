@@ -48,6 +48,14 @@
 
 **运行要求**：`mcp_env` 配置 `MEMORY_MCP_LLM_API_BASE`（根路径，如 `https://api.deepseek.com`）、`MEMORY_MCP_LLM_API_KEY`、`MEMORY_MCP_LLM_MODEL`；`MEMORY_MCP_LLM_EXTRACT=1`。
 
+### Store L2 语义冲突 ✅（2026-05-24）
+
+| 交付物 | 代码位置 |
+|--------|----------|
+| 规则候选（tools/tags/artifact + outcome 对立） | `internal/memoryagent/conflict_detect.go` |
+| mini LLM A/B/C + 默认 C | `internal/memoryagent/l2_conflict.go` |
+| 接入 Store 异步链 | `pipeline.go` → `finalizeStoreOutput`；`factworld.processJob` |
+
 ### Phase-2d（退化与对齐）✅
 
 | 交付物 | 代码位置 |
@@ -95,7 +103,7 @@
 | 项 | 优先级 | 说明 |
 |----|--------|------|
 | 控制台读持久 `edges.jsonl` | P2 | 当前仍由 facts 推导展示，与 retrieve 用的边一致但未直读文件 |
-| L2 冲突 mini LLM（Store） | P2 | 仅高 weight 事实冲突时三选一 A/B/C |
+| L2 冲突 mini LLM（Store） | ✅ | `memoryagent` L2：规则候选 + A/B/C；`MEMORY_MCP_L2_CONFLICT` |
 | `source` 多租户分库 | P2+ | 同文件仅 JSON 字段 |
 | Host 双次 retrieve 合并缓存 | 待议 | 设计讨论项，非 MCP 单独交付 |
 

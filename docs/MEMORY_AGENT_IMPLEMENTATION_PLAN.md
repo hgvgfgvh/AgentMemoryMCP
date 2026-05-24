@@ -540,6 +540,12 @@ AgentTestMemoryMCP/internal/
 - [x] supersede + 访问衰减 + retrieve touch  
 - [x] embedding≥0.92 硬合并；0.85–0.92 异步对齐  
 
+### L2 语义冲突 ✅（2026-05-24）
+
+- [x] `conflict_detect.go` 规则候选  
+- [x] `l2_conflict.go` mini LLM A/B/C + 无 LLM 默认 C  
+- [x] `pipeline.go` / `factworld.go` 接入（异步 Store，B 时不 persist）
+
 ### 2e ⏸ 暂缓
 
 - [ ] R4' LLM prune — **不排期**（见 §13）

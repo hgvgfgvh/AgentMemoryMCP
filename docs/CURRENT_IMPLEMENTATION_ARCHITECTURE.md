@@ -313,6 +313,7 @@ sequenceDiagram
 | Pitfall / 路由抑制 | ✅ | `exec_simple_match=no` |
 | LLM 结构化抽取 + L1 Fuzzy | ✅ `memoryagent/*` | S5 失败回退 rules |
 | supersede / embedding 对齐 | ✅ `degenerate` + `entity` + `align` | 异步对齐不阻塞 Store |
+| L2 语义冲突（Store A/B/C） | ✅ | `MEMORY_MCP_L2_CONFLICT`（默认开） |
 | 可选 retrieve LLM prune | ⏸ **暂缓** | 见 `IMPLEMENTATION_PROGRESS.md` §2e |
 | Host 不挂载 MCP / 字符串协议 | ✅ | 保持 |
 | 伴生 Console | ✅ | **P2**：仍由 facts 推导展示边，未直读 `edges.jsonl` |

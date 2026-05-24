@@ -215,6 +215,10 @@ func (e *FactWorldEngine) processJob(jobID string, in StoreInput) error {
 	existing, _ := e.repo.List()
 	out := memoryagent.ProcessEpisode(ctx, jobID, in.Source, in.Kind, in.CorrelationID, in.Content, existing)
 	if len(out.Facts) == 0 {
+		if out.SkipNewFact {
+			log.Printf("[factworld] store job %s: L2 dropped new fact (B)", jobID)
+			return nil
+		}
 		return fmt.Errorf("no facts extracted")
 	}
 	atomRepo, err := atoms.NewRepo(e.dataDir)
@@ -246,6 +250,9 @@ func (e *FactWorldEngine) processJob(jobID string, in StoreInput) error {
 		log.Printf("[factworld] store job %s: rules fallback (llm off or failed)", jobID)
 	} else {
 		log.Printf("[factworld] store job %s: llm extract atoms_kept=%d dropped=%d", jobID, out.AtomsKept, out.AtomsDrop)
+	}
+	if out.L2Applied {
+		log.Printf("[factworld] store job %s: L2 conflict candidates=%d drop_new=%v", jobID, out.L2CandidateCount, out.L2DropNew)
 	}
 	all, err := e.repo.List()
 	if err != nil {

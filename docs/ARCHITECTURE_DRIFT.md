@@ -42,7 +42,7 @@
 | 项 | 分类 | 说明 |
 |----|------|------|
 | **Phase-2e retrieve LLM prune** | **`deferred`** | **2026-05-24 决定暂不实现**；默认 BM25 足够，见 `IMPLEMENTATION_PROGRESS.md` |
-| L2 Store 冲突 mini LLM | `technical debt` | 可选；非闭环必需 |
+| L2 Store 冲突 mini LLM | **`aligned`** | `conflict_detect.go` + `l2_conflict.go`；默认启用 |
 | 控制台优先读 `edges.jsonl` | `technical debt` | 展示仍 facts 推导，retrieve 已用持久边 |
 | 多租户 `source` 分库 | `technical debt` | 仅 JSON 字段 |
 | Neo4j / 外置图库 | `aligned`（不做） | 宪法禁止默认引入 |

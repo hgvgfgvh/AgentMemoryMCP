@@ -23,15 +23,11 @@ func ProcessEpisode(ctx context.Context, jobID, source, kind, correlationID, con
 		log.Printf("[memoryagent] template: %v", err)
 	}
 
-	tryLLM := LLMExtractEnabled()
 	var client *llm.Client
-	if tryLLM {
-		if c, ok := llm.ConfigFromEnv(); ok {
-			client = &c
-		} else {
-			tryLLM = false
-		}
+	if c, ok := llm.ConfigFromEnv(); ok {
+		client = &c
 	}
+	tryLLM := LLMExtractEnabled() && client != nil
 
 	if tryLLM && client != nil && tmpl != nil {
 		extractCtx, cancel := context.WithTimeout(ctx, 50*time.Second)
@@ -44,9 +40,7 @@ func ProcessEpisode(ctx context.Context, jobID, source, kind, correlationID, con
 			out.AtomsKept = kept
 			out.AtomsDrop = dropped
 			if len(out.Facts) > 0 {
-				f := out.Facts[0]
-				f, out.SupersedeIDs, out.FuzzyPairs = EnrichAlignment(f, existing, correlationID, out.SupersedeIDs)
-				out.Facts[0] = f
+				out = finalizeStoreOutput(ctx, client, content, out, existing, correlationID)
 				return out
 			}
 		} else if err != nil {
@@ -59,8 +53,19 @@ func ProcessEpisode(ctx context.Context, jobID, source, kind, correlationID, con
 	if len(out.Facts) > 0 {
 		f := out.Facts[0]
 		f.LastActive = f.CreatedAt
-		f, out.SupersedeIDs, out.FuzzyPairs = EnrichAlignment(f, existing, correlationID, nil)
 		out.Facts[0] = f
+		out = finalizeStoreOutput(ctx, client, content, out, existing, correlationID)
 	}
+	return out
+}
+
+func finalizeStoreOutput(ctx context.Context, client *llm.Client, episodeContent string, out ProcessOutput, existing []facts.Fact, correlationID string) ProcessOutput {
+	if len(out.Facts) == 0 {
+		return out
+	}
+	f := out.Facts[0]
+	f, out.SupersedeIDs, out.FuzzyPairs = EnrichAlignment(f, existing, correlationID, out.SupersedeIDs)
+	out.Facts[0] = f
+	ApplyL2Conflict(ctx, client, episodeContent, &out, existing, correlationID)
 	return out
 }

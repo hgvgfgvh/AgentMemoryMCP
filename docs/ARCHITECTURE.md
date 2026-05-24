@@ -122,7 +122,11 @@ data/
 | `MEMORY_MCP_RETRIEVE_BUDGET_MS` | `300` | retrieve 总预算（**2b 起强制**） |
 | `MEMORY_MCP_RETRIEVE_PRUNE` | `bm25` | 仅 `bm25` 已实现；`llm` 属 **2e 暂缓** |
 | `MEMORY_MCP_LLM_EXTRACT` | `1` | Store 是否 LLM（**2c**） |
-| `MEMORY_MCP_LLM_API_BASE` / `MODEL` | - | OpenAI 兼容（**2c**） |
+| `MEMORY_MCP_LLM_API_BASE` / `MODEL` | - | OpenAI 兼容（**2c** / **L2**） |
+| `MEMORY_MCP_L2_CONFLICT` | 启用 | `0`/`false` 关闭 Store 语义冲突 L2 |
+| `MEMORY_MCP_L2_MIN_OLD_WEIGHT` | `0.5` | 旧 fact 参与冲突候选最低 weight |
+| `MEMORY_MCP_L2_MAX_CANDIDATES` | `3` | 每 episode 最多 L2 候选数 |
+| `MEMORY_MCP_L2_TIMEOUT_MS` | `15000` | L2 mini LLM 超时（失败 → C 共存降权） |
 
 ---
 

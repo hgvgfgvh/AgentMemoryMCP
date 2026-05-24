@@ -44,14 +44,18 @@ type EdgeExtract struct {
 
 // ProcessOutput Store 流水线最终产物。
 type ProcessOutput struct {
-	Facts        []facts.Fact
-	Atoms        []StoredAtom
-	UsedLLM      bool
-	Fallback     bool
-	AtomsKept    int
-	AtomsDrop    int
-	SupersedeIDs []string
-	FuzzyPairs   []entity.FuzzyPair
+	Facts            []facts.Fact
+	Atoms            []StoredAtom
+	UsedLLM          bool
+	Fallback         bool
+	AtomsKept        int
+	AtomsDrop        int
+	SupersedeIDs     []string
+	FuzzyPairs       []entity.FuzzyPair
+	SkipNewFact      bool // L2 判 B：不写新 fact
+	L2Applied        bool
+	L2CandidateCount int
+	L2DropNew        bool
 }
 
 // StoredAtom 持久化原子记录。

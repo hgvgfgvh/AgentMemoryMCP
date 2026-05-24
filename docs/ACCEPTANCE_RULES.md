@@ -143,6 +143,25 @@ go run ./scripts/memory_complex_test
 
 ---
 
+## Phase-2c+ L2 语义冲突（Store）✅
+
+### AR-L2-1 候选
+
+- [x] 同 tools/tags/artifacts 主题重叠 + outcome 对立 → 进入候选
+- [x] 低 weight / superseded / 同 correlation 不进入 L2
+
+### AR-L2-2 裁决
+
+- [x] 有 LLM：mini 调用 A/B/C；超时/失败 → **C**
+- [x] 无 LLM：默认 **C**（降 confidence/weight）
+- [x] **A** → supersede 旧 fact；**B** → 不写新 fact；**C** → 共存降权
+
+### AR-L2-3 开关
+
+- [x] `MEMORY_MCP_L2_CONFLICT=0` 关闭整条 L2 链
+
+---
+
 ## Phase-2e（可选 retrieve LLM）⏸ 暂缓 — 不验收
 
 > **2026-05-24 决定**：暂不实现。以下项**不适用**，保留为将来若重启 2e 时的验收草案。
