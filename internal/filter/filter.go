@@ -13,18 +13,12 @@ var chitchatExact = map[string]struct{}{
 	"在吗": {}, "在不在": {}, "ok": {}, "好的": {}, "嗯": {}, "哦": {},
 }
 
-// ShouldSkipStore 是否应对 memory_store 做 no-op。
+// ShouldSkipStore 是否应对 memory_store 做 no-op（寒暄 / Soul 边界 / 无执行信号）。
 func ShouldSkipStore(content string) (skip bool, reason string) {
+	if skip, reason := classifyStoreScope(content); skip {
+		return skip, reason
+	}
 	s := trimForMatch(content)
-	if s == "" {
-		return true, "empty_content"
-	}
-	if len([]rune(s)) < 2 {
-		return true, "too_short"
-	}
-	if _, ok := chitchatExact[s]; ok {
-		return true, "chitchat"
-	}
 	if isMostlyPunctuation(s) {
 		return true, "punctuation_only"
 	}

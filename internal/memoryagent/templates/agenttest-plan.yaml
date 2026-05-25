@@ -35,3 +35,5 @@ prompt_rules: |
   - tools 与 artifacts 不得超出预解析列表
   - 每条 atom 必须带 evidence，且为 episode 原文摘录（可截断至 300 字）
   - summary.text 用中文，格式类似：历史需求: ... 结果: ... 工具: ...
+  - **职责**：仅抽取「任务执行」事实（工具调用、产物路径、步骤成败、pitfall）；勿存用户称呼/身份/寒暄/人格议题（属 Soul MCP）
+  - 若 episode 无 tools/artifacts/计划步结果，summary.outcome 用 unknown，且 supersede_fact_ids 留空
